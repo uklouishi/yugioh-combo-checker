@@ -19,8 +19,9 @@ export function App() {
   ];
   return (
     <>
-      <header className="topbar">
+      <header className={route.page === "home" ? "topbar dark-bar" : "topbar"}>
         <a className="brand" href={href.home()}>
+          <span className="card-back brand-back" aria-hidden="true" />
           Combo Checker
         </a>
         <nav>
