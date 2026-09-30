@@ -1,91 +1,154 @@
-import { useCombos } from "../data/store";
-import { analyzeCombo } from "../model/analysis";
+import { useEffect, useRef, useState } from "react";
 import { href } from "../router";
 
-const ENTRIES = [
+// 主菜单：每项前面的小卡用卡框颜色区分（效果怪兽 / 连接 / 魔法 / 陷阱）
+const MENU = [
+  { to: href.play(), label: "开始练习", frame: "effect", main: true },
+  { to: href.open(), label: "打开 combo", frame: "link" },
+  { to: href.create(), label: "创建 combo", frame: "spell" },
+  { to: href.analyze(), label: "分析手坑", frame: "trap" },
+];
+
+const HOW_TO = [
   {
-    to: href.create(),
-    title: "创建 Combo",
-    body: "搜索英文卡名，选好起手，一步步记录展开和卡片移动。场地和吃坑点会实时预览。",
-    cta: "开始创建",
+    title: "导入牌组",
+    body: "粘贴 YDK 或 ydke:// 链接，选 TCG 或 OCG 禁卡表。",
   },
   {
-    to: href.analyze(),
-    title: "分析 Combo",
-    body: "看一条展开在哪一步最脆弱：每张手坑最早能打哪里、打了之后是直接断还是终场变弱。",
-    cta: "选择 combo 分析",
+    title: "抽 5 张，打出 combo",
+    body: "在真实规则引擎上一步步展开，能撤销、重来、换一手。",
   },
   {
-    to: href.open(),
-    title: "打开 Combo",
-    body: "浏览内置和你保存的 combo，在决斗场地上逐步播放；也可以上传 JSON 文件。",
-    cta: "浏览 combo",
+    title: "对手发动手坑",
+    body: "Ash Blossom、Infinite Impermanence 等能连锁时立刻提示，还可以让对手真的发动。",
+    hit: true,
   },
 ];
 
 export function HomePage() {
-  const { all } = useCombos();
-  const recent = all.slice(-4).reverse();
   return (
-    <main className="page home">
-      <section className="hero">
-        <div className="eyebrow">Yu-Gi-Oh! Combo Checker</div>
-        <h1>研究展开，找出吃坑点</h1>
-        <p className="lede">记录一条 combo 从起手到终场的每一步，自动标出 Ash Blossom、Maxx "C"、Nibiru 等手坑能在哪里打断你。</p>
+    <main className="title-screen">
+      <section className="rival-hand" aria-label="对手手牌">
+        <span className="caption">对手手牌 · 5</span>
+        <div className="fan">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <span
+              key={i}
+              className={`card-back${i === 2 ? " is-alert" : ""}`}
+            />
+          ))}
+        </div>
+        <span className="hint">
+          对手可以发动 Ash Blossom &amp; Joyous Spring
+        </span>
       </section>
 
-      <a className="feature" href={href.play()}>
-        <div className="eyebrow">核心功能</div>
-        <h2>实战练习</h2>
-        <p>
-          粘贴 YDK 或 ydke:// 链接导入牌组，在场地上直接打出你的 combo。检索、特殊召唤、连锁和时点由 EDOPro 规则引擎按真实规则自动处理，不需要手动设置效果。
-        </p>
-        <p>对手手里放着手坑：每个能被打断的时点都会在悬浮窗里提示，还可以回到那一刻让对手真的发动，看被打断后怎么继续。</p>
-        <span className="cta">导入牌组开始 →</span>
-      </a>
-
-      <section className="entries">
-        {ENTRIES.map((e) => (
-          <a key={e.to} className="entry" href={e.to}>
-            <h2>{e.title}</h2>
-            <p>{e.body}</p>
-            <span className="cta">{e.cta} →</span>
-          </a>
-        ))}
+      <section className="title-stage">
+        <div className="title-block">
+          <div className="field-grid" aria-hidden="true">
+            <div>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <span key={i} />
+              ))}
+            </div>
+            <div className="emz">
+              <span />
+              <span />
+            </div>
+            <div>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <span key={i} />
+              ))}
+            </div>
+          </div>
+          <h1>
+            COMBO
+            <br />
+            CHECKER
+          </h1>
+          <p className="tagline">先攻展开 · 手坑模拟</p>
+        </div>
+        <nav className="main-menu">
+          {MENU.map((m) => (
+            <a
+              key={m.to}
+              href={m.to}
+              className={m.main ? "is-main" : undefined}
+            >
+              <span className={`mini-card f-${m.frame}`} aria-hidden="true" />
+              <span>{m.main ? `▶ ${m.label}` : m.label}</span>
+            </a>
+          ))}
+        </nav>
+        <HowToPlay />
       </section>
 
-      {recent.length > 0 && (
-        <section className="recent">
-          <h2 className="section-title">最近的 combo</h2>
-          <ul className="combo-list">
-            {recent.map((c) => {
-              const a = analyzeCombo(c);
-              return (
-                <li key={c.id}>
-                  <div className="info">
-                    <div className="eyebrow">{c.deck}</div>
-                    <a className="ctitle" href={href.view(c.id)}>
-                      {c.title}
-                    </a>
-                    <div className="muted">
-                      {a.stepCount} 步 · {a.handtraps.length} 种手坑能打
-                      {a.firstComboEnd ? ` · 最早第 ${a.firstComboEnd} 步可能被直接断` : ""}
-                    </div>
-                  </div>
-                  <div className="row-actions">
-                    <a className="btn" href={href.view(c.id)}>
-                      打开
-                    </a>
-                    <a className="btn" href={href.analyze(c.id)}>
-                      分析
-                    </a>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
+      <footer className="title-foot">
+        非官方粉丝工具 · 卡图来自 YGOPRODeck · 规则引擎与卡片脚本 AGPL-3.0
+      </footer>
     </main>
+  );
+}
+
+function HowToPlay() {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const onDown = (e: PointerEvent) => {
+      if (box.current && !box.current.contains(e.target as Node))
+        setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onDown);
+    };
+  }, [open]);
+
+  return (
+    <div className="how-to" ref={box}>
+      <button
+        type="button"
+        className="help-btn"
+        aria-label="玩法说明"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        ?
+      </button>
+      {open && (
+        <div className="how-pop" role="dialog" aria-label="玩法说明">
+          <div className="how-head">
+            <b>HOW TO PLAY</b>
+            <button
+              type="button"
+              className="how-close"
+              aria-label="关闭"
+              onClick={() => setOpen(false)}
+            >
+              ✕
+            </button>
+          </div>
+          <ol>
+            {HOW_TO.map((s, i) => (
+              <li key={s.title} className={s.hit ? "is-hit" : undefined}>
+                <span className="chain-badge">
+                  <small>CHAIN</small>
+                  {i + 1}
+                </span>
+                <div>
+                  <b>{s.title}</b>
+                  <p>{s.body}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </div>
   );
 }
