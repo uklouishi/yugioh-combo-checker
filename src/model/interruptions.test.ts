@@ -69,3 +69,23 @@ describe("simulate", () => {
     expect(() => simulate(broken)).toThrow(/墓地里没有 Snake-Eye Ash/);
   });
 });
+
+describe("作者排序和默认备注", () => {
+  it("说明的顺序就是重要性排序，没排过的排在后面", () => {
+    const c = structuredClone(snakeEye);
+    const s2 = c.steps.find((s) => s.id === "s2")!;
+    s2.interruptions = [
+      { handtrap: HT.DROLL, note: "", applies: true },
+      { handtrap: HT.ASH, impact: "combo_ends", note: "先防这个", applies: true },
+    ];
+    const hits = deriveInterruptions(c).filter((i) => i.stepId === "s2");
+    expect(hits.slice(0, 2).map((h) => h.handtrap)).toEqual([HT.DROLL, HT.ASH]);
+    expect(hits[0].rank).toBe(0);
+    expect(hits[0].impact).toBeUndefined();
+    // 备注留空时不覆盖自动理由
+    expect(hits[0].note).toBeUndefined();
+    expect(hits[0].reason).toMatch(/检索全部被锁/);
+    expect(hits[1].note).toBe("先防这个");
+    expect(hits.slice(2).every((h) => h.rank === undefined)).toBe(true);
+  });
+});

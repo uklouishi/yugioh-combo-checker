@@ -354,3 +354,50 @@ textarea { width: 100%; min-height: 72px; resize: vertical; }
 
 .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
 .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; background: var(--c); }
+
+/* 编辑器：每一步的吃坑点 */
+.hit-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.hit-chip {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12px;
+  padding: 3px 8px 3px 3px; border-radius: 999px; border: 1px solid var(--c); background: var(--cbg); color: var(--fg);
+}
+.hit-chip .n { width: 18px; height: 18px; border-radius: 50%; background: var(--c); color: var(--surface); display: grid; place-items: center; font: 700 11px var(--mono); }
+.hit-chip .lvl { color: var(--c); font-weight: 700; }
+
+/* 吃坑点悬浮窗 */
+.float-window {
+  position: fixed; z-index: 40;
+  right: 16px; top: calc(72px + env(safe-area-inset-top, 0px));
+  width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 100px);
+  display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+}
+@media (max-width: 600px) { .float-window { right: 12px; top: calc(60px + env(safe-area-inset-top, 0px)); } }
+.float-window header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); cursor: grab; touch-action: none; user-select: none; }
+.float-window .wtitle { font-weight: 700; }
+.float-window .wbody { overflow-y: auto; padding: 10px 12px; display: grid; gap: 8px; }
+.float-window .wbody > .muted { margin: 0; }
+.float-window footer { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--line); }
+.ht-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ht-row { border: 1px solid var(--line); border-radius: 8px; padding: 8px; display: grid; gap: 6px; background: var(--bg); }
+.ht-row.dragging { border-color: var(--accent); opacity: 0.7; }
+.ht-row.off { opacity: 0.55; }
+.ht-row.off .ht-name { text-decoration: line-through; }
+.ht-head { display: flex; align-items: center; gap: 8px; }
+.ht-head .grip { cursor: grab; color: var(--muted); }
+.ht-head .rank { font: 700 12px var(--mono); color: var(--accent); width: 18px; text-align: center; }
+.ht-head .thumb { position: relative; width: 24px; aspect-ratio: 59 / 86; flex: none; }
+.ht-head .thumb .placeholder > * { display: none; }
+.ht-name { flex: 1 1 auto; min-width: 0; font-weight: 700; font-size: 13px; }
+.ht-name .muted { font-weight: 400; }
+.ht-tools { display: flex; gap: 2px; }
+.ht-controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ht-row textarea { min-height: 52px; font-size: 13px; }
+.linkish.small { font-size: 12px; color: var(--muted); justify-self: start; }
+.panel { grid-template-columns: minmax(0, 1fr); }
+.step-edit { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.step-edit header { min-width: 0; }
+.step-title { min-width: 0; }
+.fields select, .move-row select, .note-row select, .chips-edit select, .ht-controls select { max-width: 100%; }
+.action-row { min-width: 0; }

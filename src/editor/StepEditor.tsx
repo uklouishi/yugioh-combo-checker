@@ -1,11 +1,11 @@
-import { handtraps } from "../data";
+import { handtrapById } from "../data";
+import type { Interruption } from "../model/interruptions";
 import { zoneName } from "../model/board";
 import {
   EffectTag,
   SummonMethod,
   type Activation,
   type CardRef,
-  type InterruptionNote,
   type Move,
   type Step,
   type StepAction,
@@ -13,6 +13,8 @@ import {
   type Zone,
 } from "../model/schema";
 import { EFFECT_LABEL, IMPACT_OPTIONS, KIND_LABEL, METHOD_LABEL, ZONES } from "./labels";
+
+const IMPACT_SHORT = Object.fromEntries(IMPACT_OPTIONS) as Record<string, string>;
 import { EMPTY_CARD, suggestMoves } from "./draft";
 
 interface Props {
@@ -20,12 +22,14 @@ interface Props {
   index: number;
   total: number;
   pool: CardRef[];
-  steps: Step[];
   selected: boolean;
   onSelect: () => void;
   onChange: (step: Step) => void;
   onRemove: () => void;
   onMoveStep: (dir: -1 | 1) => void;
+  /** 这一步合并后的吃坑点（作者排序在前）。 */
+  hits: Interruption[];
+  onOpenHandtraps: () => void;
 }
 
 const fid = (step: Step, ...parts: Array<string | number>) => ["step", step.id, ...parts].join("-");
@@ -72,11 +76,10 @@ function CardList({ id, value, pool, onChange }: { id: string; value: CardRef[];
   );
 }
 
-export function StepEditor({ step, index, total, pool, steps, selected, onSelect, onChange, onRemove, onMoveStep }: Props) {
+export function StepEditor({ step, index, total, pool, selected, onSelect, onChange, onRemove, onMoveStep, hits, onOpenHandtraps }: Props) {
   const set = (patch: Partial<Step>) => onChange({ ...step, ...patch });
   const setAction = (i: number, a: StepAction) => set({ actions: step.actions.map((x, j) => (j === i ? a : x)) });
   const setMove = (i: number, m: Move) => set({ moves: step.moves.map((x, j) => (j === i ? m : x)) });
-  const setNote = (i: number, n: InterruptionNote) => set({ interruptions: step.interruptions.map((x, j) => (j === i ? n : x)) });
 
   const addSummon = () =>
     set({ actions: [...step.actions, { type: "summon", summon: { card: EMPTY_CARD, method: "normal", from: "hand" } }] });
@@ -220,75 +223,31 @@ export function StepEditor({ step, index, total, pool, steps, selected, onSelect
 
       <div className="sub">
         <div className="sub-head">
-          <h4>吃坑说明（可选）</h4>
+          <h4>吃坑点</h4>
           <div className="adds">
-            <button
-              className="btn"
-              onClick={() =>
-                set({ interruptions: [...step.interruptions, { handtrap: handtraps[0].id, impact: "combo_ends", note: "", applies: true }] })
-              }
-            >
-              + 说明
+            <button className="btn" onClick={onOpenHandtraps}>
+              排序和备注
             </button>
           </div>
         </div>
-        <p className="muted">能打哪一步会自动推导。这里补充被打断后的后果，或者排除误判。</p>
-        {step.interruptions.map((n, i) => (
-          <div key={i} className="note-row">
-            <select id={fid(step, "n", i, "ht")} value={n.handtrap} onChange={(e) => setNote(i, { ...n, handtrap: Number(e.target.value) })}>
-              {handtraps.map((h) => (
-                <option key={h.id} value={h.id}>
-                  {h.name}
-                </option>
-              ))}
-            </select>
-            <select
-              id={fid(step, "n", i, "impact")}
-              value={n.impact}
-              onChange={(e) => setNote(i, { ...n, impact: e.target.value as InterruptionNote["impact"] })}
-            >
-              {IMPACT_OPTIONS.map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
-              ))}
-            </select>
-            <label className="check">
-              <input
-                id={fid(step, "n", i, "applies")}
-                type="checkbox"
-                checked={!n.applies}
-                onChange={(e) => setNote(i, { ...n, applies: !e.target.checked })}
-              />
-              实际打不了
-            </label>
-            {n.impact === "reroute" && (
-              <select
-                id={fid(step, "n", i, "fallback")}
-                value={n.fallbackStepId ?? ""}
-                onChange={(e) => setNote(i, { ...n, fallbackStepId: e.target.value || undefined })}
-                aria-label="备用路线从哪一步继续"
+        {hits.length === 0 ? (
+          <p className="muted">这一步没有自动识别出的吃坑点。</p>
+        ) : (
+          <div className="hit-chips">
+            {hits.map((h, i) => (
+              <button
+                key={h.handtrap}
+                className={`hit-chip ${h.impact ? `s-${h.impact}` : "s-auto"}`}
+                onClick={onOpenHandtraps}
+                title={h.note ?? h.reason}
               >
-                <option value="">备用路线从…</option>
-                {steps.map((s, k) => (
-                  <option key={s.id} value={s.id}>
-                    第 {k + 1} 步
-                  </option>
-                ))}
-              </select>
-            )}
-            <input
-              id={fid(step, "n", i, "note")}
-              className="grow"
-              value={n.note}
-              onChange={(e) => setNote(i, { ...n, note: e.target.value })}
-              placeholder="被打断后会怎样，怎么应对"
-            />
-            <button className="mini" onClick={() => set({ interruptions: step.interruptions.filter((_, j) => j !== i) })}>
-              移除
-            </button>
+                <span className="n">{i + 1}</span>
+                {handtrapById.get(h.handtrap)?.name ?? h.handtrap}
+                <span className="lvl">{h.impact ? IMPACT_SHORT[h.impact] : h.rank === undefined ? "自动" : "未评估"}</span>
+              </button>
+            ))}
           </div>
-        ))}
+        )}
       </div>
 
       <label className="field-label" htmlFor={fid(step, "notes")}>

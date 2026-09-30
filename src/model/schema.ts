@@ -115,11 +115,15 @@ export const InterruptionImpact = z.enum([
 export type InterruptionImpact = z.infer<typeof InterruptionImpact>;
 
 /** 作者手写的吃坑说明，覆盖/补充自动推导结果。 */
+/**
+ * 作者对某一步某张手坑的说明。同一步里说明的先后顺序就是重要性排序（越靠前越重要）。
+ */
 export const InterruptionNote = z.object({
   handtrap: CardId,
-  impact: InterruptionImpact,
-  /** 为什么能/不能打，打了之后怎么办。中文即可。 */
-  note: z.string(),
+  /** 不写表示还没评估。 */
+  impact: InterruptionImpact.optional(),
+  /** 为什么能/不能打，打了之后怎么办。留空时显示自动推导的理由。 */
+  note: z.string().default(""),
   /** false 表示「自动推导说能打，但实际上不值得/不能」。 */
   applies: z.boolean().default(true),
   fallbackStepId: z.string().optional(),

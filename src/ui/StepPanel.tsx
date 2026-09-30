@@ -15,7 +15,6 @@ const TIMING: Record<string, string> = {
   after_summon: "召唤成功后",
   after_resolution: "效果处理后",
 };
-const ORDER: Record<string, number> = { combo_ends: 0, reroute: 1, reduced_endboard: 2, minor: 3 };
 
 interface Props {
   combo: Combo;
@@ -35,9 +34,8 @@ export function StepPanel({ combo, frame, hits, handtraps, cards, onFrame, onOpe
   const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
   const total = combo.steps.length;
   const step = frame > 0 ? combo.steps[frame - 1] : undefined;
-  const stepHits = step
-    ? hits.filter((h) => h.stepId === step.id).sort((a, b) => (ORDER[a.impact ?? ""] ?? 4) - (ORDER[b.impact ?? ""] ?? 4))
-    : [];
+  // 顺序已经按作者排的重要性排好（没排过的按严重度）。
+  const stepHits = step ? hits.filter((h) => h.stepId === step.id) : [];
 
   const onPointerDown = (e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest("button")) return;

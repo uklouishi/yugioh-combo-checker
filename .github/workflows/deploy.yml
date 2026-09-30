@@ -17,6 +17,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -28,6 +29,18 @@ jobs:
       - run: npm run validate
       # 从 YGOPRODeck 拉取卡牌资料并下载卡图到 public/card-images/
       - run: npm run sync-cards
+      # 全部卡图：先恢复上次的缓存，只下载新卡，再把结果存回缓存
+      - uses: actions/cache/restore@v4
+        with:
+          path: public/card-images
+          key: card-images-${{ github.run_id }}
+          restore-keys: card-images-
+      - run: npm run sync-all-images
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: public/card-images
+          key: card-images-${{ github.run_id }}
       - run: npm run build
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
