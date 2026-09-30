@@ -542,7 +542,7 @@ textarea { width: 100%; min-height: 72px; resize: vertical; }
   .play-side { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; }
 }
 .play-main, .play-side { min-width: 0; display: grid; gap: 12px; }
-.duel-field { display: grid; gap: 8px; }
+.duel-field { display: grid; gap: 8px; user-select: none; -webkit-user-select: none; }
 .duel-field .mat { width: min(100%, max(340px, calc(100vh - 420px))); }
 .opp-hand { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; justify-content: center; }
 .opp-hand .label, .duel-field .hand-row .label { font-size: 12px; color: var(--muted); width: 100%; text-align: center; }
@@ -635,3 +635,58 @@ button.slot:disabled { cursor: default; }
 .harmonia p { margin: 0; }
 .harmonia .field { display: grid; gap: 4px; max-width: 420px; }
 .harmonia input { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: inherit; }
+
+/* 练习：拖拽出牌、卡上按钮、悬浮选择窗 */
+.play-hint { margin-left: auto; font-size: 12px; }
+.fcard { touch-action: manipulation; }
+.fcard.selected .card { box-shadow: 0 0 0 3px var(--accent), 0 0 14px 2px var(--glow); }
+.card img { -webkit-user-drag: none; user-select: none; }
+.hand-row .slot.draggable { cursor: grab; }
+.hand-row .slot.draggable .fcard { touch-action: none; }
+.hand-row .slot.draggable:hover .card { transform: translateY(-4px); }
+.play.dragging, .play.dragging * { cursor: grabbing !important; user-select: none; }
+.play.dragging .hand-row .slot.draggable:hover .card { transform: none; }
+.play.dragging .mat .slot[data-zone^="0-4-"]:not(:has(.fcard)),
+.play.dragging .mat .slot[data-zone^="0-8-"]:not(:has(.fcard)) { border-color: var(--glow); border-style: dashed; }
+.slot.drop-hover { background: rgba(255, 179, 71, 0.28); border-style: solid !important; }
+.slot.placeable { cursor: pointer; border: 2px solid var(--glow); background: rgba(255, 179, 71, 0.18); animation: pulse 1.2s ease-in-out infinite; }
+.slot.placeable:hover { background: rgba(255, 179, 71, 0.4); }
+.slot.placeable .zlabel { color: #fff; font-weight: 700; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 3px rgba(255, 179, 71, 0.35); } }
+.drag-ghost { position: fixed; z-index: 50; width: 64px; aspect-ratio: 59 / 86; pointer-events: none; transform: translate(-50%, -60%) rotate(-4deg); filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.45)); }
+
+.card-menu {
+  position: fixed; z-index: 40; transform: translate(-50%, calc(-100% - 8px));
+  display: grid; gap: 4px; width: max-content; max-width: min(260px, calc(100vw - 16px));
+  padding: 6px; background: var(--surface); border: 2px solid var(--accent); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+.card-menu.below { transform: translate(-50%, 8px); }
+.card-menu .cm-name { font-size: 11px; font-weight: 700; color: var(--muted); overflow-wrap: anywhere; }
+.card-menu .btn.small { font-size: 13px; padding: 5px 10px; }
+.card-menu .btn.small:first-of-type { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.slot.pile.guide { box-shadow: 0 0 0 2px var(--glow), 0 0 16px 4px var(--glow); animation: pulse 1.2s ease-in-out infinite; }
+.guide-tip {
+  position: absolute; left: 50%; top: -6px; transform: translate(-50%, -100%); z-index: 3; white-space: nowrap;
+  font: 700 11px var(--body); background: var(--glow); color: #1b1f27; padding: 1px 6px; border-radius: 4px; pointer-events: none;
+}
+.guide-tip::after { content: ""; position: absolute; left: 50%; bottom: -4px; margin-left: -4px; border: 4px solid transparent; border-bottom: 0; border-top-color: var(--glow); }
+.pile-grid { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); align-items: start; }
+.pile-item { display: grid; gap: 4px; }
+.pile-item .btn.small { justify-content: center; text-align: center; }
+.pile-item.has-acts .deck-card { box-shadow: 0 0 0 2px var(--glow); }
+
+.prompt-float {
+  position: fixed; z-index: 25; left: 50%; transform: translateX(-50%);
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  width: min(560px, calc(100vw - 24px));
+}
+.prompt-float .prompt { max-height: 58vh; overflow-y: auto; box-shadow: 0 10px 32px rgba(0, 0, 0, 0.35); }
+@media (min-width: 1000px) {
+  /* 放在场地那一栏的上半部分（对手那边），不挡手卡和右侧面板 */
+  .prompt-float { top: 118px; bottom: auto; left: calc((100vw - min(100vw, 1320px)) / 2 + 16px + (min(100vw, 1320px) - 32px - 394px) / 2); width: min(560px, calc(min(100vw, 1320px) - 32px - 394px)); }
+  .prompt-float .prompt { max-height: calc(100vh - 300px); }
+}
+.prompt-float.hidden .prompt > :not(header) { display: none; }
+.prompt-float.hidden .prompt { opacity: 0.92; }
+.prompt-tools { display: inline-flex; gap: 2px; flex: none; }
