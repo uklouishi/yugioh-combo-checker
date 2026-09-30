@@ -14,6 +14,7 @@
     "sync-engine": "tsx scripts/sync-engine.ts"
   },
   "dependencies": {
+    "html-to-image": "^1.11.13",
     "ocgcore-wasm": "npm:@jsr/n1xx1__ocgcore-wasm@^0.1.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

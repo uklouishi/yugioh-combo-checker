@@ -4,6 +4,35 @@ import type { EngineData } from "../engine/data";
 import { activateAt, loadCore, settle, startDuel, undoResponses } from "../engine/run";
 import type { DuelSession, DuelSetup, Hit } from "../engine/session";
 
+const RESUME_KEY = "play-resume-v1";
+
+/** 当前对局存到 sessionStorage（同一个标签页里去分析页再回来时接着打）。bigint 存成 {$big}。 */
+function remember(s: DuelSession | null) {
+  try {
+    if (!s) sessionStorage.removeItem(RESUME_KEY);
+    else
+      sessionStorage.setItem(
+        RESUME_KEY,
+        JSON.stringify({ setup: s.setup, responses: s.responses }, (_, v) => (typeof v === "bigint" ? { $big: v.toString() } : v)),
+      );
+  } catch {
+    // 存储不可用时不影响对局
+  }
+}
+
+/** 读出上次的对局（没有则为 null）。 */
+export function savedDuel(): { setup: DuelSetup; responses: OcgResponse[] } | null {
+  try {
+    const raw = sessionStorage.getItem(RESUME_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw, (_, v) => (v && typeof v === "object" && typeof v.$big === "string" ? BigInt(v.$big) : v));
+  } catch {
+    return null;
+  }
+}
+
+export const forgetDuel = () => remember(null);
+
 /** 管理当前对局：开局、回应、撤销、回到吃坑点让对手发动。session 在原地变化，用计数器触发重绘。 */
 export function useDuel(data: EngineData | null) {
   const core = useRef<OcgCoreSync | null>(null);
@@ -23,6 +52,7 @@ export function useDuel(data: EngineData | null) {
         core.current ??= await loadCore();
         const s = await startDuel(core.current, data, setup, responses);
         setSession(s);
+        remember(s);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -41,7 +71,11 @@ export function useDuel(data: EngineData | null) {
         const s = await settle(core.current, data, session);
         setBusy(false);
         setSession(s);
-      } else bump();
+        remember(s);
+      } else {
+        remember(session);
+        bump();
+      }
     },
     [session, data],
   );
