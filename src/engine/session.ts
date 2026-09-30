@@ -250,7 +250,8 @@ export class DuelSession {
       if (i >= 0) deck.splice(i, 1);
       add(0, c, OcgLocation.HAND);
     }
-    for (const c of deck) add(0, c, OcgLocation.DECK);
+    // 引擎不会自己洗牌（EDOPro 是由服务器洗好再放进去），最后放入的在卡组最上面
+    for (const c of shuffle(deck, setup.seed)) add(0, c, OcgLocation.DECK);
     for (const c of setup.extra) add(0, c, OcgLocation.EXTRA);
     for (const c of setup.opponentHand) add(1, c, OcgLocation.HAND);
     for (let i = 0; i < 40; i++) add(1, FILLER, OcgLocation.DECK);
@@ -510,6 +511,24 @@ export class DuelSession {
 
 /** 对手卡组的填充卡（Dark Magician），只为了卡组里有东西。 */
 export const FILLER = 46986414;
+
+/** 按种子洗牌（mulberry32 + Fisher-Yates），同一个种子结果相同，重放时抽到的牌不变。 */
+export function shuffle<T>(items: T[], seed: number): T[] {
+  const out = [...items];
+  let a = seed >>> 0;
+  const rand = () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
 
 function seedOf(n: number): [bigint, bigint, bigint, bigint] {
   const b = BigInt(n >>> 0) + 1n;

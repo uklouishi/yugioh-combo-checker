@@ -105,6 +105,15 @@ describe("DuelSession", () => {
     expect(t.field()[0].hand.map((c) => c.code)).toEqual([ASH]);
   });
 
+  it("draws a different random hand for each seed, and the same hand for the same seed", async () => {
+    const random = { ...setup, main: [...Array(10).fill(ASH), ...Array(10).fill(POPLAR), ...Array(10).fill(OAK), ...Array(10).fill(OSS)], hand: null };
+    const handOf = async (seed: number) => (await startDuel(core, data, { ...random, seed })).field()[0].hand.map((c) => c.code).join(",");
+    const hands = new Set<string>();
+    for (let seed = 1; seed <= 6; seed++) hands.add(await handOf(seed));
+    expect(hands.size).toBeGreaterThan(1);
+    expect(await handOf(3)).toBe(await handOf(3));
+  });
+
   it("ends the turn and stops before the opponent acts", async () => {
     const s = await startDuel(core, data, setup);
     s.respond({ type: OcgResponseType.SELECT_IDLECMD, action: 7, index: null });
