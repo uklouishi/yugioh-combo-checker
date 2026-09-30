@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { AnalyzePage } from "./pages/AnalyzePage";
 import { EditorPage } from "./pages/EditorPage";
 import { HomePage } from "./pages/HomePage";
@@ -5,9 +6,13 @@ import { OpenPage } from "./pages/OpenPage";
 import { ViewPage } from "./pages/ViewPage";
 import { href, useRoute } from "./router";
 
+// 规则引擎约 1.2 MB，只在练习页加载
+const PlayPage = lazy(() => import("./pages/PlayPage"));
+
 export function App() {
   const route = useRoute();
   const nav = [
+    { to: href.play(), label: "练习", active: route.page === "play" },
     { to: href.open(), label: "打开", active: route.page === "open" || route.page === "view" },
     { to: href.create(), label: "创建", active: route.page === "create" || route.page === "edit" },
     { to: href.analyze(), label: "分析", active: route.page === "analyze" },
@@ -27,6 +32,11 @@ export function App() {
         </nav>
       </header>
       {route.page === "home" && <HomePage />}
+      {route.page === "play" && (
+        <Suspense fallback={<main className="page"><p className="muted">正在加载规则引擎…</p></main>}>
+          <PlayPage />
+        </Suspense>
+      )}
       {route.page === "open" && <OpenPage />}
       {route.page === "view" && <ViewPage key={route.id} id={route.id} initialStep={route.step} />}
       {route.page === "analyze" && <AnalyzePage key={route.id ?? ""} id={route.id} />}

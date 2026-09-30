@@ -1,8 +1,9 @@
-/** 极简 hash 路由：#/、#/open、#/create、#/edit/<id>、#/view/<id>[/<step>]、#/analyze/<id>。 */
+/** 极简 hash 路由：#/、#/play、#/open、#/create、#/edit/<id>、#/view/<id>[/<step>]、#/analyze/<id>。 */
 import { useEffect, useState } from "react";
 
 export type Route =
   | { page: "home" }
+  | { page: "play" }
   | { page: "open" }
   | { page: "create" }
   | { page: "edit"; id: string }
@@ -12,6 +13,8 @@ export type Route =
 export function parseHash(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
   switch (parts[0]) {
+    case "play":
+      return { page: "play" };
     case "open":
       return { page: "open" };
     case "create":
@@ -29,6 +32,7 @@ export function parseHash(hash: string): Route {
 
 export const href = {
   home: () => "#/",
+  play: () => "#/play",
   open: () => "#/open",
   create: () => "#/create",
   edit: (id: string) => `#/edit/${encodeURIComponent(id)}`,
