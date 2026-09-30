@@ -44,10 +44,21 @@ export function Viewer({ combo, initialStep }: { combo: Combo; initialStep: numb
     useCallback(() => setPlay((p) => (p && beats && p.beat + 1 < beats.length ? { ...p, beat: p.beat + 1 } : null)), [beats]),
   );
 
+  const [animate, setAnimate] = useState(loadAnimate);
+  const toggleAnimate = (on: boolean) => {
+    setAnimate(on);
+    if (!on) setPlay(null);
+    try {
+      localStorage.setItem(ANIMATE_KEY, on ? "1" : "0");
+    } catch {
+      // 存不了就只在这次打开时生效
+    }
+  };
+
   const go = (f: number) => {
     const to = Math.max(0, Math.min(combo.steps.length, f));
-    // 往后走一步时播放这一步的动画，其余直接跳过去
-    setPlay(to === frame + 1 ? { step: frame, beat: 0 } : null);
+    // 往后走一步时播放这一步的动画（动画打开时），其余直接跳过去
+    setPlay(animate && to === frame + 1 ? { step: frame, beat: 0 } : null);
     setFrame(to);
   };
   const replay = () => frame > 0 && setPlay({ step: frame - 1, beat: 0 });
@@ -89,7 +100,7 @@ export function Viewer({ combo, initialStep }: { combo: Combo; initialStep: numb
         </div>
       </div>
 
-      <BeatCaption caption={beat?.caption} chain={beat?.chain} active={beat?.active} idle={frame === 0 ? "起手局面。点 ▶ 或按 → 开始，每一步都会演示卡片怎么移动。" : `步骤 ${frame}：${combo.steps[frame - 1].title}`} />
+      <BeatCaption caption={beat?.caption} chain={beat?.chain} active={beat?.active} idle={frame === 0 ? (animate ? "起手局面。点 ▶ 或按 → 开始，每一步都会演示卡片怎么移动。" : "起手局面。点 ▶ 或按 → 开始。") : `步骤 ${frame}：${combo.steps[frame - 1].title}`} />
 
       <div className="field-wrap" ref={fieldRef}>
         <Field
@@ -112,6 +123,8 @@ export function Viewer({ combo, initialStep }: { combo: Combo; initialStep: numb
         onOpen={setOpenCard}
         playing={play !== null}
         onReplay={replay}
+        animate={animate}
+        onAnimate={toggleAnimate}
       />
 
       {openCard !== null && (
@@ -125,6 +138,17 @@ export function Viewer({ combo, initialStep }: { combo: Combo; initialStep: numb
       )}
     </main>
   );
+}
+
+const ANIMATE_KEY = "view-animate-v1";
+
+/** 上次选的动画开关，默认打开。 */
+function loadAnimate(): boolean {
+  try {
+    return localStorage.getItem(ANIMATE_KEY) !== "0";
+  } catch {
+    return true;
+  }
 }
 
 /** 场地上方的解说条：播放时说明这一拍发生了什么，并列出当前的连锁。 */

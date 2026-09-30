@@ -820,3 +820,5 @@ button.slot:disabled { cursor: default; }
 }
 /* 解说条占了一点高度，场地相应缩小，让自己的手卡、卡组也尽量在一屏里 */
 .field-wrap .mat { width: min(100%, max(340px, calc(100vh - 360px))); }
+.step-panel .mini.anim-toggle { border: 1px solid var(--line); border-radius: 6px; font-size: 12px; white-space: nowrap; }
+.step-panel .mini.anim-toggle.on { border-color: var(--glow); color: var(--accent); }

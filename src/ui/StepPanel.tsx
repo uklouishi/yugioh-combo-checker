@@ -29,6 +29,9 @@ interface Props {
   /** 正在播放这一步的动画。 */
   playing?: boolean;
   onReplay?: () => void;
+  /** 切换步骤时是否播放动画。 */
+  animate?: boolean;
+  onAnimate?: (on: boolean) => void;
 }
 
 /** 这一步里发生的事：发动带连锁序号，召唤写召唤方式。 */
@@ -55,7 +58,7 @@ function StepActions({ step }: { step: Step }) {
 }
 
 /** 切换步骤的悬浮窗：可以拖动、可以收起，不挡场地。 */
-export function StepPanel({ combo, frame, hits, handtraps, cards, onFrame, onOpen, playing, onReplay }: Props) {
+export function StepPanel({ combo, frame, hits, handtraps, cards, onFrame, onOpen, playing, onReplay, animate, onAnimate }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
@@ -91,6 +94,16 @@ export function StepPanel({ combo, frame, hits, handtraps, cards, onFrame, onOpe
         <button className="arrow" onClick={() => onFrame(frame + 1)} disabled={frame === total} aria-label="下一步">
           ▶
         </button>
+        {onAnimate && (
+          <button
+            className={`mini anim-toggle${animate ? " on" : ""}`}
+            onClick={() => onAnimate(!animate)}
+            aria-pressed={animate}
+            title={animate ? "关闭卡片移动动画，切换步骤时直接跳到结果" : "打开卡片移动动画"}
+          >
+            动画 {animate ? "开" : "关"}
+          </button>
+        )}
         <button className="mini" onClick={() => setCollapsed(!collapsed)} aria-expanded={!collapsed}>
           {collapsed ? "展开" : "收起"}
         </button>
@@ -101,7 +114,7 @@ export function StepPanel({ combo, frame, hits, handtraps, cards, onFrame, onOpe
             <>
               <div className="stitle">{step.title}</div>
               <StepActions step={step} />
-              {onReplay && (
+              {onReplay && animate && (
                 <button className="mini replay" onClick={onReplay} disabled={playing}>
                   {playing ? "演示中…" : "↻ 重播这一步的动画"}
                 </button>
