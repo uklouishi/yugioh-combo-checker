@@ -683,8 +683,9 @@ button.slot:disabled { cursor: default; }
 }
 .prompt-float .prompt { max-height: 58vh; overflow-y: auto; box-shadow: 0 10px 32px rgba(0, 0, 0, 0.35); }
 @media (min-width: 1000px) {
-  /* 放在场地那一栏的上半部分（对手那边），不挡手卡和右侧面板 */
-  .prompt-float { top: 118px; bottom: auto; left: calc((100vw - min(100vw, 1320px)) / 2 + 16px + (min(100vw, 1320px) - 32px - 394px) / 2); width: min(560px, calc(min(100vw, 1320px) - 32px - 394px)); }
+  /* 放在场地那一栏的上半部分（对手那边），不挡手卡和右侧面板。
+     场地栏中心 = 50vw - (右栏 380 + 间距 14) / 2，不管页面宽度是否到 1320 上限都成立 */
+  .prompt-float { top: 118px; bottom: auto; left: calc(50vw - 197px); width: min(560px, calc(100vw - 426px)); }
   .prompt-float .prompt { max-height: calc(100vh - 300px); }
 }
 .prompt-float.hidden .prompt > :not(header) { display: none; }
