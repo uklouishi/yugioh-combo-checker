@@ -85,7 +85,7 @@ export function StepPanel({ combo, frame, hits, handtraps, cards, onFrame, onOpe
                       <CardView id={h.handtrap} name={ht?.name ?? String(h.handtrap)} info={cards.get(h.handtrap)} onOpen={onOpen} />
                     </div>
                     <div>
-                      <span className="hname">{ht?.nameZh ?? h.handtrap}</span>
+                      <span className="hname">{ht?.name ?? h.handtrap}</span>
                       <span className="htag">
                         {h.impact ? IMPACT[h.impact] : "自动推导"} · {TIMING[h.timing]}
                       </span>

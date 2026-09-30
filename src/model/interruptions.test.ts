@@ -20,32 +20,32 @@ describe("combo 数据", () => {
 });
 
 describe("deriveInterruptions", () => {
-  it("检索效果吃灰流丽、锁鸟，场上怪兽效果吃泡影/遮蒙者/幽鬼兔", () => {
+  it("检索效果吃 Ash Blossom、Droll & Lock Bird，场上怪兽效果吃 Infinite Impermanence / Effect Veiler / Ghost Ogre", () => {
     expect(ids("s2")).toEqual(
       expect.arrayContaining([HT.ASH, HT.DROLL, HT.IMPERM, HT.VEILER, HT.GHOST_OGRE]),
     );
     expect(at("s2").find((i) => i.handtrap === HT.ASH)?.impact).toBe("combo_ends");
   });
 
-  it("增殖的G 标在第一次特召", () => {
+  it('Maxx "C" 标在第一次特召', () => {
     expect(deriveInterruptions(snakeEye).find((i) => i.handtrap === HT.MAXX_C)?.stepId).toBe("s3");
   });
 
-  it("尼比鲁标在第 5 次召唤", () => {
+  it("Nibiru标在第 5 次召唤", () => {
     const nib = deriveInterruptions(snakeEye).filter((i) => i.handtrap === HT.NIBIRU);
     expect(nib.map((i) => i.stepId)).toEqual(["s7"]);
   });
 
-  it("手卡发动的魔法只吃灰流丽，不吃幽鬼兔", () => {
+  it("手卡发动的魔法只吃 Ash Blossom，不吃 Ghost Ogre", () => {
     expect(ids("s5")).toContain(HT.ASH);
     expect(ids("s5")).not.toContain(HT.GHOST_OGRE);
   });
 
-  it("墓地苏生吃屋敷童，以墓地为对象吃 D.D.乌鸦", () => {
+  it("墓地苏生吃 Ghost Belle，以墓地为对象吃 D.D. Crow", () => {
     expect(ids("s6")).toEqual(expect.arrayContaining([HT.GHOST_BELLE, HT.DD_CROW]));
   });
 
-  it("作者标注 applies=false 会移除自动结果（cost 送墓后泡影没有对象）", () => {
+  it("作者标注 applies=false 会移除自动结果（cost 送墓后 Infinite Impermanence 没有对象）", () => {
     expect(ids("s10")).toContain(HT.ASH);
     expect(ids("s10")).not.toContain(HT.IMPERM);
     expect(ids("s10")).not.toContain(HT.VEILER);
@@ -53,7 +53,7 @@ describe("deriveInterruptions", () => {
 });
 
 describe("simulate", () => {
-  it("按 moves 算出终场：公主在额外怪兽区，Flamberge 在怪兽区", async () => {
+  it("按 moves 算出终场：Promethean Princess 在额外怪兽区，Flamberge 在怪兽区", async () => {
     const { simulate } = await import("./board");
     const last = simulate(snakeEye).at(-1)!.board;
     expect(last.emz[0]?.card.id).toBe(2772337);

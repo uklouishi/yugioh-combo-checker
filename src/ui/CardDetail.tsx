@@ -20,10 +20,7 @@ export function CardDetail({ id, name, info, handtrap, onClose }: Props) {
   return (
     <div className="overlay" onClick={onClose}>
       <div className="dialog" role="dialog" aria-modal="true" aria-label={name} onClick={(e) => e.stopPropagation()}>
-        <h2>
-          {name}
-          {handtrap && `（${handtrap.nameZh}）`}
-        </h2>
+        <h2>{name}</h2>
         <div className="detail">
           <div className="img">
             <CardView id={id} name={name} info={info} />

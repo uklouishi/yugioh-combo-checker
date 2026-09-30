@@ -30,13 +30,13 @@ export type Zone = z.infer<typeof Zone>;
 
 /**
  * 一次「发动」中包含的效果处理，用来判断哪些手坑能命中。
- * 按卡片文本如实标注：比如灰流丽只看「是否包含从卡组检索/特召/送墓」。
+ * 按卡片文本如实标注：比如 Ash Blossom 只看「是否包含从卡组检索/特召/送墓」。
  */
 export const EffectTag = z.enum([
   "add_from_deck", // 从卡组加入手卡（检索）
   "ss_from_deck", // 从卡组特殊召唤
   "send_from_deck_to_gy", // 从卡组送去墓地
-  "set_from_deck", // 从卡组盖放（灰流丽不命中）
+  "set_from_deck", // 从卡组盖放（Ash Blossom 不命中）
   "add_from_gy", // 从墓地回收到手卡/卡组/额外
   "ss_from_gy", // 从墓地特殊召唤
   "banish_from_gy", // 除外墓地的卡
@@ -70,7 +70,7 @@ export const CardRef = z.object({
 });
 export type CardRef = z.infer<typeof CardRef>;
 
-/** 一次召唤（算入尼比鲁的 5 次计数）。 */
+/** 一次召唤（算入 Nibiru 的 5 次计数）。 */
 export const Summon = z.object({
   card: CardRef,
   method: SummonMethod,
@@ -83,7 +83,7 @@ export type Summon = z.infer<typeof Summon>;
 /** 一次卡片发动（怪兽效果 / 魔陷发动 / 魔陷效果）。 */
 export const Activation = z.object({
   card: CardRef,
-  /** 发动时卡片所在区域：决定幽鬼兔、泡影、遮蒙者等能否命中。 */
+  /** 发动时卡片所在区域：决定 Ghost Ogre、Infinite Impermanence、Effect Veiler 等能否命中。 */
   from: Zone,
   kind: z.enum(["monster_effect", "spell_card", "trap_card", "spell_trap_effect"]),
   /** 这张卡的第几个效果（按卡片文本顺序，1 起），方便 UI 高亮文本。 */
@@ -100,7 +100,7 @@ export type Activation = z.infer<typeof Activation>;
 export const StepAction = z.discriminatedUnion("type", [
   z.object({ type: z.literal("summon"), summon: Summon }),
   z.object({ type: z.literal("activate"), activation: Activation }),
-  /** 效果处理后产生的召唤，与 activate 分开写，便于尼比鲁/增殖的G 计数。 */
+  /** 效果处理后产生的召唤，与 activate 分开写，便于 Nibiru/Maxx "C" 计数。 */
   z.object({ type: z.literal("resolve_summon"), summon: Summon }),
 ]);
 export type StepAction = z.infer<typeof StepAction>;
@@ -187,7 +187,6 @@ export type Combo = z.infer<typeof Combo>;
 export const Handtrap = z.object({
   id: CardId,
   name: z.string(),
-  nameZh: z.string(),
   /** 一句话中文说明：什么时候能打。 */
   summary: z.string(),
 });

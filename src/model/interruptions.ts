@@ -113,7 +113,7 @@ export function deriveInterruptions(combo: Combo): Interruption[] {
             stepId: step.id,
             actionIndex,
             timing: "after_summon",
-            reason: `这是本回合第 ${summons} 次召唤，从这里开始尼比鲁可以发动`,
+            reason: `这是本回合第 ${summons} 次召唤，从这里开始 Nibiru 可以发动`,
           });
         }
       }

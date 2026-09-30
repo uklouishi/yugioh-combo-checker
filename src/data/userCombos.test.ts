@@ -14,7 +14,7 @@ describe("parseCombos", () => {
     const bad = parseCombos("{", combos);
     expect(!bad.ok && bad.errors[0]).toMatch(/不是合法的 JSON/);
     const missing = parseCombos(JSON.stringify({ id: "x" }), combos);
-    expect(!missing.ok && missing.errors.join("\n")).toMatch(/字段 deck/);
+    expect(!missing.ok && missing.errors.join("\n")).toMatch(/卡组/);
   });
 
   it("卡片移动对不上时报错", () => {
@@ -22,5 +22,12 @@ describe("parseCombos", () => {
     broken.steps[0].moves[0].from = "gy";
     const r = parseCombos(JSON.stringify(broken), combos);
     expect(!r.ok && r.errors.join("\n")).toMatch(/墓地里没有 Snake-Eye Ash/);
+  });
+});
+
+describe("describePath", async () => {
+  const { describePath } = await import("./userCombos");
+  it("把路径翻译成中文", () => {
+    expect(describePath(["steps", 0, "actions", 1, "summon", "card", "id"])).toBe("步骤 1 › 动作 2 › 卡片");
   });
 });
