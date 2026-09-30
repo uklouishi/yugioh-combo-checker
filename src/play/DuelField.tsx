@@ -1,4 +1,5 @@
 import { OcgLocation } from "ocgcore-wasm";
+import { useRef } from "react";
 import type { EngineData } from "../engine/data";
 import type { FieldCard, PlayerField } from "../engine/session";
 import { CardView } from "../ui/CardView";
@@ -15,8 +16,22 @@ interface Ctx {
   data: EngineData;
   /** 当前提示里可以点的卡（locKey）。 */
   active: Set<string>;
-  onCard: (loc: CardLoc, code: number) => void;
+  /** 点了场上 / 手里的卡。el 用来把操作按钮放在卡上。 */
+  onCard: (loc: CardLoc, code: number, el: HTMLElement) => void;
   onPile: (title: string, cards: FieldCard[], controller: number, location: number) => void;
+  /** 当前选中的卡（显示操作按钮的那张）。 */
+  selected?: string | null;
+  /** 选择放置区域时可以点的空格（locKey）。 */
+  places?: Set<string>;
+  onZone?: (loc: CardLoc) => void;
+  /** 手卡按下时开始拖拽；返回 false 表示这张卡现在不能拖。 */
+  onDragStart?: (loc: CardLoc, code: number, e: React.PointerEvent<HTMLElement>) => boolean;
+  /** 可以拖出去的手卡（locKey）。 */
+  draggable?: Set<string>;
+  /** 拖拽中手指 / 鼠标下面的区域。 */
+  dropHover?: string | null;
+  /** 可以从额外卡组特殊召唤的怪兽数，大于 0 时额外卡组区域发光提示。 */
+  extraReady?: number;
 }
 
 const FACEDOWN = 0x2 | 0x8;
@@ -25,17 +40,22 @@ const DEFENSE = 0x4 | 0x8;
 function Card({ ctx, card, loc, hidden }: { ctx: Ctx; card: FieldCard; loc: CardLoc; hidden?: boolean }) {
   const key = locKey(loc);
   const isActive = ctx.active.has(key);
+  const ref = useRef<HTMLDivElement>(null);
   const onField = loc.location === OcgLocation.MZONE || loc.location === OcgLocation.SZONE;
   const faceDown = onField && (card.position & FACEDOWN) !== 0;
   const name = ctx.data.name(card.code);
   return (
-    <div className={`fcard${isActive ? " active" : ""}${faceDown && !hidden ? " set" : ""}`}>
+    <div
+      ref={ref}
+      className={`fcard${isActive ? " active" : ""}${ctx.selected === key ? " selected" : ""}${faceDown && !hidden ? " set" : ""}`}
+      onPointerDown={loc.location === OcgLocation.HAND && ctx.onDragStart ? (e) => ctx.onDragStart!(loc, card.code, e) : undefined}
+    >
       <CardView
         id={card.code}
         name={name}
         faceDown={hidden}
         defense={loc.location === OcgLocation.MZONE && (card.position & DEFENSE) !== 0}
-        onOpen={() => ctx.onCard(loc, card.code)}
+        onOpen={() => ref.current && ctx.onCard(loc, card.code, ref.current)}
       />
       {card.overlays.length > 0 && <span className="count">{card.overlays.length}</span>}
     </div>
@@ -43,25 +63,47 @@ function Card({ ctx, card, loc, hidden }: { ctx: Ctx; card: FieldCard; loc: Card
 }
 
 function Zone({ ctx, card, loc, label }: { ctx: Ctx; card: FieldCard | null; loc: CardLoc; label: string }) {
-  return <div className="slot">{card ? <Card ctx={ctx} card={card} loc={loc} /> : <span className="zlabel">{label}</span>}</div>;
+  const key = locKey(loc);
+  const placeable = ctx.places?.has(key);
+  const cls = `slot${placeable ? " placeable" : ""}${ctx.dropHover === key ? " drop-hover" : ""}`;
+  if (placeable)
+    return (
+      <div
+        className={cls}
+        data-zone={key}
+        role="button"
+        tabIndex={0}
+        aria-label={`放到${label}`}
+        onClickCapture={(e) => {
+          e.stopPropagation();
+          ctx.onZone?.(loc);
+        }}
+        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && ctx.onZone?.(loc)}
+      >
+        {card ? <Card ctx={ctx} card={card} loc={loc} /> : <span className="zlabel">{label}</span>}
+      </div>
+    );
+  return (
+    <div className={cls} data-zone={key}>
+      {card ? <Card ctx={ctx} card={card} loc={loc} /> : <span className="zlabel">{label}</span>}
+    </div>
+  );
 }
 
 function Pile({ ctx, cards, controller, location, label, hidden }: { ctx: Ctx; cards: FieldCard[]; controller: number; location: number; label: string; hidden?: boolean }) {
   const top = cards.at(-1);
   const anyActive = cards.some((_, i) => ctx.active.has(locKey({ controller, location, sequence: i })));
+  const guide = controller === 0 && location === OcgLocation.EXTRA && (ctx.extraReady ?? 0) > 0;
   return (
     <button
-      className={`slot pile${anyActive ? " has-active" : ""}`}
+      className={`slot pile${anyActive ? " has-active" : ""}${guide ? " guide" : ""}`}
       title={`${label}（${cards.length}）`}
       onClick={() => ctx.onPile(label, cards, controller, location)}
       disabled={cards.length === 0}
     >
-      {top ? (
-        <div className="card">{hidden ? <div className="back" /> : <CardView id={top.code} name={ctx.data.name(top.code)} />}</div>
-      ) : (
-        <span className="zlabel">{label}</span>
-      )}
+      {top ? <div className="card">{hidden ? <div className="back" /> : <CardView id={top.code} name={ctx.data.name(top.code)} />}</div> : <span className="zlabel">{label}</span>}
       {cards.length > 0 && <span className="count">{cards.length}</span>}
+      {guide && <span className="guide-tip">可特召 {ctx.extraReady}</span>}
     </button>
   );
 }
@@ -95,8 +137,8 @@ export function DuelField({ me, opp, lp, ...ctx }: Props) {
   const M = OcgLocation.MZONE;
   const S = OcgLocation.SZONE;
   const emz = (mine: 5 | 6, theirs: 5 | 6) => {
-    if (me.monsters[mine]) return <Zone ctx={ctx} card={me.monsters[mine]} loc={{ controller: 0, location: M, sequence: mine }} label="额外怪兽" />;
-    return <Zone ctx={ctx} card={opp.monsters[theirs]} loc={{ controller: 1, location: M, sequence: theirs }} label="额外怪兽" />;
+    if (opp.monsters[theirs]) return <Zone ctx={ctx} card={opp.monsters[theirs]} loc={{ controller: 1, location: M, sequence: theirs }} label="额外怪兽" />;
+    return <Zone ctx={ctx} card={me.monsters[mine]} loc={{ controller: 0, location: M, sequence: mine }} label="额外怪兽" />;
   };
   return (
     <div className="duel-field">
@@ -111,7 +153,7 @@ export function DuelField({ me, opp, lp, ...ctx }: Props) {
         ))}
       </div>
       <div className="mat-scroll">
-        <div className="mat" aria-label="决斗场地">
+        <div className="mat" aria-label="决斗场地" data-zone="mat">
           <DeckPile count={opp.deck} label="卡组" />
           {FIVE.map((i) => (
             <Zone key={`os${i}`} ctx={ctx} card={opp.spells[4 - i]} loc={{ controller: 1, location: S, sequence: 4 - i }} label="魔陷" />
@@ -150,7 +192,7 @@ export function DuelField({ me, opp, lp, ...ctx }: Props) {
           自己 LP {lp[0]} · 手卡 {me.hand.length}
         </span>
         {me.hand.map((c, i) => (
-          <div className="slot" key={`h${i}`}>
+          <div className={`slot${ctx.draggable?.has(locKey({ controller: 0, location: OcgLocation.HAND, sequence: i })) ? " draggable" : ""}`} key={`h${i}`}>
             <Card ctx={ctx} card={c} loc={{ controller: 0, location: OcgLocation.HAND, sequence: i }} />
           </div>
         ))}

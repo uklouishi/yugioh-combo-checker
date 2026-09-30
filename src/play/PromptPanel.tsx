@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { EngineData } from "../engine/data";
 import { autoRespond, freePlaces, locName, type Prompt } from "../engine/session";
 import { CardView } from "../ui/CardView";
+import { activationText, cardActions } from "./cardActions";
 import { locKey, type CardLoc } from "./DuelField";
 import { ATTRIBUTES, describe, placeLabel, POSITION_LABEL, RACES } from "./text";
 
@@ -14,6 +15,9 @@ interface Props {
   /** 在场上点卡时，如果是当前可选的卡，直接交给这里处理。 */
   pickRef: { current: ((loc: CardLoc) => boolean) | null };
   onRespond: (r: OcgResponse) => void;
+  /** 标题栏右侧额外的按钮（悬浮窗的收起）。 */
+  headerExtra?: React.ReactNode;
+  className?: string;
 }
 
 interface Choice {
@@ -30,7 +34,7 @@ function Thumb({ data, code }: { data: EngineData; code: number }) {
 }
 
 /** 当前要做的选择。每种引擎提示对应一种界面；任何时候都可以点「自动」交给默认选择。 */
-export function PromptPanel({ data, prompt, focus, pickRef, onRespond }: Props) {
+export function PromptPanel({ data, prompt, focus, pickRef, onRespond, headerExtra, className }: Props) {
   const m = prompt.msg;
   const [picked, setPicked] = useState<number[]>([]);
   useEffect(() => setPicked([]), [prompt]);
@@ -66,24 +70,8 @@ export function PromptPanel({ data, prompt, focus, pickRef, onRespond }: Props) 
   switch (m.type) {
     case OcgMessageType.SELECT_IDLECMD:
     case OcgMessageType.SELECT_BATTLECMD: {
-      const groups = new Map<string, { loc: CardLoc; code: number; choices: Choice[] }>();
-      const add = (c: CardLoc & { code: number }, label: string, response: OcgResponse) => {
-        const k = locKey(c);
-        if (!groups.has(k)) groups.set(k, { loc: c, code: c.code, choices: [] });
-        groups.get(k)!.choices.push({ label, response });
-      };
-      if (m.type === OcgMessageType.SELECT_IDLECMD) {
-        const R = OcgResponseType.SELECT_IDLECMD;
-        m.summons.forEach((c, i) => add(c, "通常召唤", { type: R, action: 0, index: i }));
-        m.special_summons.forEach((c, i) => add(c, "特殊召唤", { type: R, action: 1, index: i }));
-        m.monster_sets.forEach((c, i) => add(c, "盖放", { type: R, action: 3, index: i }));
-        m.spell_sets.forEach((c, i) => add(c, "盖放", { type: R, action: 4, index: i }));
-        m.pos_changes.forEach((c, i) => add(c, "改变表示形式", { type: R, action: 2, index: i }));
-        m.activates.forEach((c, i) => add(c, `发动${activationText(data, c.description)}`, { type: R, action: 5, index: i }));
-      } else {
-        m.chains.forEach((c, i) => add(c, `发动${activationText(data, c.description)}`, { type: OcgResponseType.SELECT_BATTLECMD, action: 0, index: i }));
-      }
-      const list = [...groups.values()].sort((a, b) => Number(locKey(b.loc) === focus) - Number(locKey(a.loc) === focus));
+      const groups = [...cardActions(data, prompt).values()].map((g) => ({ ...g, choices: g.actions as Choice[] }));
+      const list = groups.sort((a, b) => Number(locKey(b.loc) === focus) - Number(locKey(a.loc) === focus));
       const end: Choice[] = [];
       if (m.type === OcgMessageType.SELECT_IDLECMD) {
         if (m.to_bp) end.push({ label: "进入战斗阶段", response: { type: OcgResponseType.SELECT_IDLECMD, action: 6, index: null } });
@@ -135,7 +123,7 @@ export function PromptPanel({ data, prompt, focus, pickRef, onRespond }: Props) 
               <Thumb data={data} code={m.code} />
               <div>
                 <div className="cg-name">是否发动 {data.name(m.code)} 的效果？</div>
-                {text && <div className="muted">{text}</div>}
+                {text && !/""|\[\]/.test(text) && <div className="muted">{text}</div>}
               </div>
             </div>
           )}
@@ -207,12 +195,7 @@ export function PromptPanel({ data, prompt, focus, pickRef, onRespond }: Props) 
           {m.unselect_cards.length > 0 && (
             <>
               <div className="field-label">已选</div>
-              <CardGrid
-                data={data}
-                cards={m.unselect_cards}
-                picked={m.unselect_cards.map((_, i) => i)}
-                onPick={(i) => onRespond({ type: OcgResponseType.SELECT_UNSELECT_CARD, index: n + i })}
-              />
+              <CardGrid data={data} cards={m.unselect_cards} picked={m.unselect_cards.map((_, i) => i)} onPick={(i) => onRespond({ type: OcgResponseType.SELECT_UNSELECT_CARD, index: n + i })} />
             </>
           )}
           <div className="prompt-foot">
@@ -308,9 +291,7 @@ export function PromptPanel({ data, prompt, focus, pickRef, onRespond }: Props) 
     case OcgMessageType.ANNOUNCE_ATTRIB:
     case OcgMessageType.ANNOUNCE_RACE: {
       const isAttr = m.type === OcgMessageType.ANNOUNCE_ATTRIB;
-      const opts: [number | bigint, string][] = isAttr
-        ? ATTRIBUTES.filter(([v]) => m.available & v)
-        : RACES.filter(([v]) => BigInt(m.available) & v);
+      const opts: [number | bigint, string][] = isAttr ? ATTRIBUTES.filter(([v]) => m.available & v) : RACES.filter(([v]) => BigInt(m.available) & v);
       const choose = (i: number) => {
         const next = picked.includes(i) ? picked.filter((x) => x !== i) : [...picked, i];
         if (next.length >= m.count) {
@@ -348,22 +329,20 @@ export function PromptPanel({ data, prompt, focus, pickRef, onRespond }: Props) 
   }
 
   return (
-    <section className="prompt" aria-live="polite">
+    <section className={`prompt${className ? ` ${className}` : ""}`} aria-live="polite">
       <header>
         <h2>{title}</h2>
-        <button className="mini" onClick={auto} title="按默认方式选择">
-          自动
-        </button>
+        <span className="prompt-tools">
+          <button className="mini" onClick={auto} title="按默认方式选择">
+            自动
+          </button>
+          {headerExtra}
+        </span>
       </header>
       {prompt.retry && <p className="errors-inline">刚才的选择不符合要求，请重新选择。</p>}
       {body}
     </section>
   );
-}
-
-function activationText(data: EngineData, desc: bigint): string {
-  const t = describe(data, desc);
-  return t ? `：${t}` : "";
 }
 
 function defaultTitle(type: number): string {

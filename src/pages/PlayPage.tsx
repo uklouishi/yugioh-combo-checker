@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { OcgLocation, OcgMessageType, OcgResponseType, type OcgResponse } from "ocgcore-wasm";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadEngineData, type EngineData } from "../engine/data";
-import type { DuelSetup, FieldCard } from "../engine/session";
+import { freePlaces, type DuelSetup, type FieldCard } from "../engine/session";
+import { actionsForDrop, cardActions, extraSummons, type CardAction } from "../play/cardActions";
+import { CardMenu, type MenuState } from "../play/CardMenu";
 import { DeckSetup } from "../play/DeckSetup";
 import { DuelField, locKey, type CardLoc } from "../play/DuelField";
 import { GainsPanel } from "../play/GainsPanel";
@@ -8,6 +11,7 @@ import { HitWindow } from "../play/HitWindow";
 import { PromptPanel } from "../play/PromptPanel";
 import { canExport, toCombo } from "../play/toCombo";
 import { useDuel } from "../play/useDuel";
+import { useHandDrag } from "../play/useHandDrag";
 import { CardView } from "../ui/CardView";
 import { downloadCombo } from "../ui/download";
 
@@ -57,9 +61,7 @@ export default function PlayPage() {
         <div className="toolbar">
           <div className="eyebrow">实战练习</div>
           <h1>导入牌组，直接打 combo</h1>
-          <p className="lede">
-            卡片效果由 EDOPro 的规则引擎自动处理：检索、特殊召唤、连锁和时点都按真实规则来。对手手里放着手坑，能打断你的地方会实时提示。
-          </p>
+          <p className="lede">卡片效果由 EDOPro 的规则引擎自动处理：检索、特殊召唤、连锁和时点都按真实规则来。对手手里放着手坑，能打断你的地方会实时提示。</p>
         </div>
         {duel.error && <p className="errors-inline">{duel.error}</p>}
         <DeckSetup data={data} onStart={start} />
@@ -74,37 +76,109 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
   const { session, busy } = duel;
   const [focus, setFocus] = useState<string | null>(null);
   const [pile, setPile] = useState<PileView | null>(null);
+  const [menu, setMenu] = useState<MenuState | null>(null);
+  const [floatHidden, setFloatHidden] = useState(false);
   const pickRef = useRef<((loc: CardLoc) => boolean) | null>(null);
   const logRef = useRef<HTMLOListElement>(null);
+  /** 拖到了哪一格：接下来引擎问放在哪里时直接用这一格。 */
+  const placeRef = useRef<CardLoc | null>(null);
+
+  const prompt = session?.status === "prompt" ? session.prompt : null;
+  const acts = useMemo(() => cardActions(data, prompt), [data, prompt, duel.version]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { respond } = duel;
+  const closeMenu = useCallback(() => setMenu(null), []);
 
   useEffect(() => {
     const el = logRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [duel.version, session]);
 
-  const onCard = useCallback((loc: CardLoc) => {
-    if (pickRef.current?.(loc)) return;
-    setFocus(locKey(loc));
-  }, []);
+  useEffect(() => {
+    setMenu(null);
+    setFloatHidden(false);
+    const want = placeRef.current;
+    if (!prompt) return;
+    const m = prompt.msg;
+    if (m.type === OcgMessageType.SELECT_IDLECMD) placeRef.current = null;
+    if (!want || m.type !== OcgMessageType.SELECT_PLACE || m.player !== 0 || m.count > 1) return;
+    placeRef.current = null;
+    const p = freePlaces(m.player, m.field_mask).find((p) => p.player === want.controller && p.location === want.location && p.sequence === want.sequence);
+    if (p) void respond({ type: OcgResponseType.SELECT_PLACE, places: [p] } as OcgResponse);
+  }, [prompt, duel.version, respond]);
+
+  const perform = useCallback(
+    (a: CardAction, place: CardLoc | null = null) => {
+      placeRef.current = place;
+      setMenu(null);
+      void respond(a.response);
+    },
+    [respond],
+  );
+
+  const drag = useHandDrag(
+    useCallback((loc: CardLoc) => acts.has(locKey(loc)), [acts]),
+    (loc, code, zone, pt) => {
+      const entry = acts.get(locKey(loc));
+      if (!entry) return;
+      const { list, exact } = actionsForDrop(entry.actions, zone);
+      const place = exact ? zone : null;
+      if (exact && list.length === 1) perform(list[0], place);
+      else {
+        setMenu({ key: locKey(loc), name: data.name(code), rect: { left: pt.x, top: pt.y, width: 0, height: 0 }, actions: list, place });
+      }
+    },
+  );
+
+  const onCard = useCallback(
+    (loc: CardLoc, code: number, el?: HTMLElement) => {
+      if (drag.wasDrag()) return;
+      if (pickRef.current?.(loc)) return;
+      const key = locKey(loc);
+      setFocus(key);
+      const entry = acts.get(key);
+      if (!entry || !el) return setMenu(null);
+      if (menu?.key === key) {
+        // 再点一次：只有一件事可做时直接做，否则收起
+        if (entry.actions.length === 1) perform(entry.actions[0]);
+        else setMenu(null);
+        return;
+      }
+      const r = el.getBoundingClientRect();
+      setMenu({ key, name: data.name(code), rect: { left: r.left, top: r.top, width: r.width, height: r.height }, actions: entry.actions, place: null });
+    },
+    [acts, data, drag, menu, perform],
+  );
 
   if (!session) return <main className="page play">{busy ? <p className="muted">正在开局…</p> : null}</main>;
 
   const [me, opp] = session.field();
-  const prompt = session.status === "prompt" ? session.prompt : null;
-  const active = new Set<string>();
+  const active = new Set<string>(acts.keys());
+  const places = new Set<string>();
   if (prompt) {
     const m = prompt.msg as unknown as Record<string, unknown>;
-    for (const key of ["summons", "special_summons", "monster_sets", "spell_sets", "pos_changes", "activates", "selects", "select_cards", "unselect_cards", "chains"]) {
+    for (const key of ["selects", "select_cards", "unselect_cards"]) {
       const list = m[key];
       if (Array.isArray(list)) for (const c of list) active.add(locKey(c as CardLoc));
     }
+    const pm = prompt.msg;
+    if ((pm.type === OcgMessageType.SELECT_PLACE || pm.type === OcgMessageType.SELECT_DISFIELD) && pm.count <= 1)
+      for (const p of freePlaces(pm.player, pm.field_mask)) places.add(locKey({ controller: p.player, location: p.location, sequence: p.sequence }));
   }
+  const onZone = (loc: CardLoc) => {
+    const pm = prompt?.msg;
+    if (!pm || (pm.type !== OcgMessageType.SELECT_PLACE && pm.type !== OcgMessageType.SELECT_DISFIELD)) return;
+    const type = pm.type === OcgMessageType.SELECT_PLACE ? OcgResponseType.SELECT_PLACE : OcgResponseType.SELECT_DISFIELD;
+    void respond({ type, places: [{ player: loc.controller, location: loc.location, sequence: loc.sequence }] } as OcgResponse);
+  };
+  const idle = prompt && (prompt.msg.type === OcgMessageType.SELECT_IDLECMD || prompt.msg.type === OcgMessageType.SELECT_BATTLECMD);
+  const floating = prompt && !idle;
+  const extraReady = prompt?.msg.type === OcgMessageType.SELECT_IDLECMD ? extraSummons(acts).length : 0;
 
   const byAction = new Map<number, typeof session.log>();
   for (const l of session.log) byAction.set(l.action, [...(byAction.get(l.action) ?? []), l]);
 
   return (
-    <main className="page play">
+    <main className={`page play${drag.drag ? " dragging" : ""}`}>
       <div className="play-bar">
         <button className="btn" onClick={onBack}>
           ← 牌组设置
@@ -129,6 +203,7 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
           保存为 combo
         </button>
         {busy && <span className="muted">引擎计算中…</span>}
+        <span className="muted play-hint">把发光的手卡拖到场上出牌，点发光的卡发动效果</span>
       </div>
 
       <div className="play-grid">
@@ -140,11 +215,21 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
             lp={session.lp}
             active={active}
             onCard={onCard}
-            onPile={(title, cards, controller, location) => setPile({ title, cards, controller, location })}
+            onPile={(title, cards, controller, location) => {
+              setMenu(null);
+              setPile({ title, cards, controller, location });
+            }}
+            selected={menu?.key ?? null}
+            places={places}
+            onZone={onZone}
+            onDragStart={drag.start}
+            draggable={new Set(acts.keys())}
+            dropHover={drag.drag?.hover ?? null}
+            extraReady={extraReady}
           />
         </div>
         <div className="play-side">
-          {prompt && <PromptPanel data={data} prompt={prompt} focus={focus} pickRef={pickRef} onRespond={(r) => void duel.respond(r)} />}
+          {prompt && idle && <PromptPanel data={data} prompt={prompt} focus={focus} pickRef={pickRef} onRespond={(r) => void respond(r)} />}
           {session.status === "turn_over" && (
             <section className="prompt done">
               <header>
@@ -187,6 +272,31 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
 
       <HitWindow data={data} hits={session.hits} actions={session.actions} busy={busy} onActivate={duel.activate} />
 
+      {floating && (
+        <div className={`prompt-float${floatHidden ? " hidden" : ""}`}>
+          <PromptPanel
+            data={data}
+            prompt={prompt}
+            focus={focus}
+            pickRef={pickRef}
+            onRespond={(r) => void respond(r)}
+            headerExtra={
+              <button className="mini" onClick={() => setFloatHidden(!floatHidden)} title={floatHidden ? "展开" : "收起，先看场地"}>
+                {floatHidden ? "展开" : "收起"}
+              </button>
+            }
+          />
+        </div>
+      )}
+
+      {menu && <CardMenu menu={menu} onPick={(a) => perform(a, menu.place)} onClose={closeMenu} />}
+
+      {drag.drag && (
+        <div className="drag-ghost" style={{ left: drag.drag.x, top: drag.drag.y }} aria-hidden>
+          <CardView id={drag.drag.code} name={data.name(drag.drag.code)} />
+        </div>
+      )}
+
       {pile && (
         <div className="overlay" onClick={() => setPile(null)}>
           <div className="dialog" role="dialog" aria-modal="true" aria-label={pile.title} onClick={(e) => e.stopPropagation()}>
@@ -194,26 +304,46 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
               {pile.controller === 1 ? "对手的" : ""}
               {pile.title}（{pile.cards.length}）
             </h2>
-            <div className="deck-grid">
-              {pile.cards.map((c, i) => {
-                const loc = { controller: pile.controller, location: pile.location, sequence: i };
-                const on = active.has(locKey(loc));
-                return (
-                  <button
-                    key={i}
-                    className={`deck-card${on ? " active" : ""}`}
-                    title={data.name(c.code)}
-                    onClick={() => {
-                      onCard(loc);
-                      setPile(null);
-                    }}
-                  >
-                    <span className="thumb">
-                      <CardView id={c.code} name={data.name(c.code)} />
-                    </span>
-                  </button>
-                );
-              })}
+            {pile.cards.some((_, i) => acts.has(locKey({ controller: pile.controller, location: pile.location, sequence: i }))) && (
+              <p className="muted">{pile.location === OcgLocation.EXTRA ? "发光的怪兽现在满足特殊召唤条件，点下面的按钮召唤。" : "发光的卡现在可以发动，点下面的按钮。"}</p>
+            )}
+            <div className="deck-grid pile-grid">
+              {pile.cards
+                .map((c, i) => ({ c, i, has: acts.has(locKey({ controller: pile.controller, location: pile.location, sequence: i })) }))
+                .sort((a, b) => Number(b.has) - Number(a.has))
+                .map(({ c, i }) => {
+                  const loc = { controller: pile.controller, location: pile.location, sequence: i };
+                  const key = locKey(loc);
+                  const on = active.has(key);
+                  const entry = acts.get(key);
+                  return (
+                    <div key={i} className={`pile-item${entry ? " has-acts" : ""}`}>
+                      <button
+                        className={`deck-card${on ? " active" : ""}`}
+                        title={data.name(c.code)}
+                        onClick={() => {
+                          if (pickRef.current?.(loc)) setPile(null);
+                        }}
+                      >
+                        <span className="thumb">
+                          <CardView id={c.code} name={data.name(c.code)} />
+                        </span>
+                      </button>
+                      {entry?.actions.map((a, j) => (
+                        <button
+                          key={j}
+                          className="btn small"
+                          onClick={() => {
+                            setPile(null);
+                            perform(a);
+                          }}
+                        >
+                          {a.label}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })}
             </div>
             <div className="row">
               <button className="btn" onClick={() => setPile(null)} autoFocus>
@@ -239,10 +369,9 @@ function saveCombo(session: Parameters<typeof toCombo>[0]) {
 function Credits() {
   return (
     <p className="muted credits">
-      规则引擎：<a href="https://github.com/edo9300/ygopro-core">EDOPro ygopro-core</a>（经{" "}
-      <a href="https://github.com/n1xx1/ocgcore-wasm">ocgcore-wasm</a> 编译为 WebAssembly）；卡片数据和效果脚本：
-      <a href="https://github.com/ProjectIgnis/BabelCDB">ProjectIgnis BabelCDB</a>、
-      <a href="https://github.com/ProjectIgnis/CardScripts">ProjectIgnis CardScripts</a>。以上项目按 AGPL-3.0 发布，本站未作修改。
+      规则引擎：<a href="https://github.com/edo9300/ygopro-core">EDOPro ygopro-core</a>（经 <a href="https://github.com/n1xx1/ocgcore-wasm">ocgcore-wasm</a> 编译为 WebAssembly）；卡片数据和效果脚本：
+      <a href="https://github.com/ProjectIgnis/BabelCDB">ProjectIgnis BabelCDB</a>、<a href="https://github.com/ProjectIgnis/CardScripts">ProjectIgnis CardScripts</a>。以上项目按 AGPL-3.0
+      发布，本站未作修改。
     </p>
   );
 }
