@@ -6,8 +6,10 @@ import { DuelField, locKey, type CardLoc } from "../play/DuelField";
 import { GainsPanel } from "../play/GainsPanel";
 import { HitWindow } from "../play/HitWindow";
 import { PromptPanel } from "../play/PromptPanel";
+import { canExport, toCombo } from "../play/toCombo";
 import { useDuel } from "../play/useDuel";
 import { CardView } from "../ui/CardView";
+import { downloadCombo } from "../ui/download";
 
 interface PileView {
   title: string;
@@ -118,6 +120,14 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
             换一手
           </button>
         )}
+        <button
+          className="btn primary"
+          onClick={() => saveCombo(session)}
+          disabled={busy || !canExport(session)}
+          title={canExport(session) ? "把这一回合的操作保存成 combo 文件，可以在「打开」页上传查看" : "打完这一回合（结束回合）后才能保存"}
+        >
+          保存为 combo
+        </button>
         {busy && <span className="muted">引擎计算中…</span>}
       </div>
 
@@ -143,7 +153,7 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
               <p>
                 这就是你的终场：场上 {me.monsters.filter(Boolean).length} 只怪兽、{me.spells.filter(Boolean).length} 张魔陷，手卡 {me.hand.length} 张。
               </p>
-              <p className="muted">可以撤销回去换一条路线，或者在吃坑点让对手发动手坑，看被打断后还能做什么。</p>
+              <p className="muted">可以撤销回去换一条路线，或者在吃坑点让对手发动手坑，看被打断后还能做什么。点上面的「保存为 combo」可以把这条路线存成文件，之后在「打开」页上传查看。</p>
             </section>
           )}
           {session.status === "error" && (
@@ -215,6 +225,15 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
       )}
     </main>
   );
+}
+
+/** 导出成 combo JSON 并下载。 */
+function saveCombo(session: Parameters<typeof toCombo>[0]) {
+  try {
+    downloadCombo(toCombo(session));
+  } catch (e) {
+    window.alert(`保存失败：${e instanceof Error ? e.message : String(e)}`);
+  }
 }
 
 function Credits() {

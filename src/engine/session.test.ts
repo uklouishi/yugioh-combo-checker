@@ -18,6 +18,9 @@ const ASH_BLOSSOM = 14558127;
 const MAXX_C = 23434538;
 const ECCLESIA_DARK_DRAGON = 78397661;
 const ALBAZ = 68468459; // Fallen of Albaz
+const HARMONIA = 70088809; // Fydraulis Harmonia
+const MALONG = 93125329; // Golden Cloud Beast - Malong
+const GAIA_KNIGHT = 97204936;
 
 const setup: DuelSetup = {
   main: [ASH, POPLAR, OAK, FLAMBERGE, OSS, ...Array(35).fill(OAK)],
@@ -57,11 +60,12 @@ function summonAsh(s: DuelSession) {
 
 /** 开局直接把额外卡组的 Ecclesia and the Dark Dragon 放到怪兽区，省掉同调召唤。 */
 function eccCore(): OcgCoreSync {
+  let seq = 2;
   return new Proxy(core, {
     get(t, k) {
       if (k === "duelNewCard")
         return (h: Parameters<OcgCoreSync["duelNewCard"]>[0], c: Parameters<OcgCoreSync["duelNewCard"]>[1]) =>
-          t.duelNewCard(h, c.code === ECCLESIA_DARK_DRAGON ? { ...c, location: OcgLocation.MZONE, sequence: 2, position: OcgPosition.FACEUP_ATTACK } : c);
+          t.duelNewCard(h, c.code === ECCLESIA_DARK_DRAGON ? { ...c, location: OcgLocation.MZONE, sequence: seq++, position: OcgPosition.FACEUP_ATTACK } : c);
       const v = t[k as keyof OcgCoreSync];
       return typeof v === "function" ? v.bind(t) : v;
     },
@@ -167,6 +171,35 @@ describe("DuelSession", () => {
     expect(t.gains.draws[0].count).toBe(1);
     expect(t.gains.draws[0].context).toContain("Fallen of Albaz");
     expect(t.field()[1].hand).toHaveLength(1);
+  });
+
+  it("lets the opponent reveal 5 Synchros with Fydraulis Harmonia, send the chosen one and use its effect", async () => {
+    const setup = { ...eccSetup([HARMONIA]), extra: [ECCLESIA_DARK_DRAGON, ECCLESIA_DARK_DRAGON], opponentExtra: [MALONG, ...Array(4).fill(GAIA_KNIGHT)], opponentSynchro: MALONG };
+    const s = await startDuel(eccCore(), data, setup);
+    const m = idle(s);
+    s.respond({ type: OcgResponseType.SELECT_IDLECMD, action: 5, index: 0 });
+    const hit = s.hits.find((h) => h.options.some((o) => o.code === HARMONIA));
+    expect(hit?.context).toContain("Ecclesia and the Dark Dragon");
+    expect(m.activates.length).toBeGreaterThan(0);
+    const t = await startDuel(eccCore(), data, setup, activateAt(s, hit!, hit!.options.find((o) => o.code === HARMONIA)!.index));
+    while (t.status === "prompt" && t.prompt!.msg.type !== OcgMessageType.SELECT_IDLECMD) {
+      const p = t.prompt!.msg;
+      if (p.type === OcgMessageType.SELECT_CHAIN) t.respond({ type: OcgResponseType.SELECT_CHAIN, index: null });
+      else if (p.type === OcgMessageType.SELECT_CARD) t.respond({ type: OcgResponseType.SELECT_CARD, indicies: [0] });
+      else if (p.type === OcgMessageType.SELECT_PLACE) t.respond({ type: OcgResponseType.SELECT_PLACE, places: [{ player: 0, location: 4, sequence: 0 }] });
+      else if (p.type === OcgMessageType.SELECT_POSITION) t.respond({ type: OcgResponseType.SELECT_POSITION, position: 1 });
+      else if (p.type === OcgMessageType.SELECT_EFFECTYN) t.respond({ type: OcgResponseType.SELECT_EFFECTYN, yes: false });
+      else throw new Error(`unexpected prompt ${p.type}`);
+    }
+    expect(t.errors).toEqual([]);
+    const [me, opp] = t.field();
+    expect(opp.monsters.some((c) => c?.code === HARMONIA)).toBe(true);
+    expect(opp.grave.map((c) => c.code)).toContain(MALONG);
+    // Harmonia 破坏了发动效果的 Ecclesia，Malong 把另一只弹回额外卡组
+    expect(me.grave.map((c) => c.code)).toContain(ECCLESIA_DARK_DRAGON);
+    expect(me.monsters.some((c) => c?.code === ECCLESIA_DARK_DRAGON)).toBe(false);
+    expect(me.extra.map((c) => c.code)).toContain(ECCLESIA_DARK_DRAGON);
+    expect(t.hits.find((h) => h.at === hit!.at)?.used).toBe(HARMONIA);
   });
 
   it("ends the turn and stops before the opponent acts", async () => {

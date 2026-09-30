@@ -231,6 +231,26 @@
     "def": 1800
   },
   {
+    "id": 70088809,
+    "name": "Fydraulis Harmonia",
+    "type": "Effect Monster",
+    "frameType": "effect",
+    "desc": "When a monster your opponent controls activates its effect (Quick Effect): You can reveal this card in your hand and up to 5 Synchro Monsters in your Extra Deck; apply all of these effects in sequence, based on the number revealed, also you cannot activate the effects of monsters Special Summoned from the Extra Deck until the end of your next turn after this effect resolves, except Synchro Monsters.\r\n● 2+: Special Summon this card.\r\n● 4+: Send 1 revealed Synchro Monster to the GY.\r\n● 6: Destroy 1 monster your opponent controls.\r\nYou can only use this effect of \"Fydraulis Harmonia\" once per turn.",
+    "race": "Dragon",
+    "card_images": [
+      {
+        "id": 70088809,
+        "image_url": "",
+        "image_url_small": "",
+        "image_url_cropped": ""
+      }
+    ],
+    "atk": 2500,
+    "attribute": "DARK",
+    "level": 7,
+    "def": 2000
+  },
+  {
     "id": 73642296,
     "name": "Ghost Belle & Haunted Mansion",
     "type": "Effect Monster",
