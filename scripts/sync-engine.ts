@@ -1,6 +1,8 @@
 /**
  * 准备规则引擎要用的数据，写到 public/engine/：
- * - cards.json：ProjectIgnis BabelCDB 的卡片数据（引擎需要的数值 + 英文卡名 + 效果说明文字）
+ * - cards.json：ProjectIgnis BabelCDB 的卡片数据（引擎需要的数值 + 英文卡名 + 效果说明文字）。
+ *   除了 cards.cdb 还读 release-*.cdb（只在一个地区发售的新卡，比如 TCG 先行的 BETB）；
+ *   BabelCDB 没收录的异画卡号，按 mycard ygopro-database 的 alias 补一行指向本体。
  * - base.json：CardScripts 根目录的公共脚本（constant.lua、utility.lua、proc_*.lua…）
  * - scripts/c<id>.lua：每张卡的效果脚本（official，缺的用 pre-release 补）
  * - strings.json：EDOPro 的系统提示文字（Select the card(s) to add to your hand…）
@@ -15,7 +17,8 @@ import { DatabaseSync } from "node:sqlite";
 
 const CACHE = ".cache/engine";
 const OUT = "public/engine";
-const CDB_URL = "https://raw.githubusercontent.com/ProjectIgnis/BabelCDB/master/cards.cdb";
+const BABEL_REPO = "https://github.com/ProjectIgnis/BabelCDB";
+const ALT_ART_CDB_URL = "https://raw.githubusercontent.com/mycard/ygopro-database/master/locales/en-US/cards.cdb";
 const STRINGS_URL = "https://raw.githubusercontent.com/ProjectIgnis/Distribution/master/config/strings.conf";
 const SCRIPTS_REPO = "https://github.com/ProjectIgnis/CardScripts";
 const LFLISTS_URL = "https://raw.githubusercontent.com/ProjectIgnis/LFLists/master/";
@@ -30,29 +33,49 @@ async function download(url: string, file: string) {
   writeFileSync(file, Buffer.from(await res.arrayBuffer()));
 }
 
-function cloneScripts(dir: string) {
-  if (existsSync(join(dir, "utility.lua")) && !refresh) return;
+function clone(repo: string, dir: string, marker: string) {
+  if (existsSync(join(dir, marker)) && !refresh) return;
   rmSync(dir, { recursive: true, force: true });
-  execFileSync("git", ["clone", "-q", "--depth", "1", SCRIPTS_REPO, dir], { stdio: "inherit" });
+  execFileSync("git", ["clone", "-q", "--depth", "1", repo, dir], { stdio: "inherit" });
 }
 
 mkdirSync(CACHE, { recursive: true });
-const cdbFile = join(CACHE, "cards.cdb");
+const babelDir = join(CACHE, "BabelCDB");
+const altArtFile = join(CACHE, "alt-art.cdb");
 const stringsFile = join(CACHE, "strings.conf");
 const scriptsDir = join(CACHE, "CardScripts");
 const lflists = [...new Set(Object.values(BANLISTS).flat())];
-await Promise.all([download(CDB_URL, cdbFile), download(STRINGS_URL, stringsFile), ...lflists.map((f) => download(LFLISTS_URL + f, join(CACHE, f)))]);
-cloneScripts(scriptsDir);
+await Promise.all([download(ALT_ART_CDB_URL, altArtFile), download(STRINGS_URL, stringsFile), ...lflists.map((f) => download(LFLISTS_URL + f, join(CACHE, f)))]);
+clone(SCRIPTS_REPO, scriptsDir, "utility.lua");
+clone(BABEL_REPO, babelDir, "cards.cdb");
 
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(join(OUT, "scripts"), { recursive: true });
 
 // cards.json：每张卡一行 [code, alias, setcode(字符串，64 位), type, level(原始值，含刻度), attribute, race(字符串), atk, def, name, strs]
-const db = new DatabaseSync(cdbFile, { readOnly: true });
 type Row = Record<string, number | bigint | string | null>;
-const stmt = db.prepare("select d.*, t.* from datas d join texts t on t.id = d.id order by d.id");
-stmt.setReadBigInts(true);
-const rows = stmt.all() as Row[];
+function readCdb(file: string): Row[] {
+  const db = new DatabaseSync(file, { readOnly: true });
+  const stmt = db.prepare("select d.*, t.* from datas d join texts t on t.id = d.id order by d.id");
+  stmt.setReadBigInts(true);
+  const rows = stmt.all() as Row[];
+  db.close();
+  return rows;
+}
+// cards.cdb 优先，同一个卡号 release-*.cdb 不覆盖
+const byId = new Map<number, Row>();
+const cdbFiles = ["cards.cdb", ...readdirSync(babelDir).filter((f) => /^release-.*\.cdb$/.test(f)).sort()];
+for (const f of cdbFiles) for (const r of readCdb(join(babelDir, f))) if (!byId.has(Number(r.id))) byId.set(Number(r.id), r);
+// 异画：卡号和本体相近（< 20），本体在 BabelCDB 里就复制本体数据，alias 指向本体（引擎按本体脚本跑）
+let altArts = 0;
+for (const r of readCdb(altArtFile)) {
+  const id = Number(r.id);
+  const base = byId.get(Number(r.alias));
+  if (!r.alias || byId.has(id) || !base || Number(base.alias) || Math.abs(id - Number(r.alias)) >= 20) continue;
+  byId.set(id, { ...base, id, alias: Number(r.alias) });
+  altArts++;
+}
+const rows = [...byId.values()].sort((a, b) => Number(a.id) - Number(b.id));
 const cards = rows.map((r) => {
   const strs: string[] = [];
   for (let i = 1; i <= 16; i++) strs.push(String(r[`str${i}`] ?? ""));
@@ -122,4 +145,4 @@ for (const [format, files] of Object.entries(BANLISTS)) {
 }
 writeFileSync(join(OUT, "banlists.json"), JSON.stringify(banlists));
 
-console.log(`引擎数据：${cards.length} 张卡，${Object.keys(base).length} 个公共脚本，${copied} 个卡片脚本，${Object.keys(sys).length} 条系统文字，禁卡表 ${Object.values(banlists).map((b) => b.name).join("、")}`);
+console.log(`引擎数据：${cards.length} 张卡（${cdbFiles.length} 个 cdb，补了 ${altArts} 个异画卡号），${Object.keys(base).length} 个公共脚本，${copied} 个卡片脚本，${Object.keys(sys).length} 条系统文字，禁卡表 ${Object.values(banlists).map((b) => b.name).join("、")}`);
