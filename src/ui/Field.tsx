@@ -1,5 +1,6 @@
 import type { CardInfo } from "../cards/ygoprodeck";
-import type { Board, PlacedCard } from "../model/board";
+import type { Board, Loc, PlacedCard } from "../model/board";
+import type { ChainMark } from "../model/playback";
 import type { Move, Zone } from "../model/schema";
 import { CardView } from "./CardView";
 
@@ -7,7 +8,31 @@ interface Ctx {
   cards: Map<number, CardInfo>;
   moved: Move[];
   onOpen: (id: number) => void;
+  /** 播放时正在连锁中的卡，显示 CHAIN 序号。 */
+  chain?: ChainMark[];
+  /** 刚发动的那一环。 */
+  active?: number;
 }
+
+const sameLoc = (a: Loc | null, zone: Zone, index?: number) => !!a && a.zone === zone && a.index === index;
+
+/** 这个格子上的连锁标记：CHAIN 序号，刚发动的那张加光圈。 */
+function ChainBadges({ ctx, zone, index }: { ctx: Ctx; zone: Zone; index?: number }) {
+  const marks = (ctx.chain ?? []).filter((c) => sameLoc(c.loc, zone, index));
+  if (!marks.length) return null;
+  return (
+    <span className="link-badges">
+      {marks.map((c) => (
+        <span key={c.link} className={`link-badge${c.link === ctx.active ? " active" : ""}`}>
+          CHAIN {c.link}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+const slotClass = (ctx: Ctx, base: string, zone: Zone, index?: number) =>
+  (ctx.chain ?? []).some((c) => c.link === ctx.active && sameLoc(c.loc, zone, index)) ? `${base} activating` : base;
 
 const movedTo = (ctx: Ctx, zone: Zone, id: number) => ctx.moved.some((m) => m.to === zone && m.card.id === id);
 
@@ -25,10 +50,11 @@ function Placed({ ctx, placed, zone, hidden }: { ctx: Ctx; placed: PlacedCard; z
   );
 }
 
-function Slot({ ctx, placed, zone, label }: { ctx: Ctx; placed: PlacedCard | null; zone: Zone; label: string }) {
+function Slot({ ctx, placed, zone, index, label }: { ctx: Ctx; placed: PlacedCard | null; zone: Zone; index: number; label: string }) {
   return (
-    <div className="slot">
+    <div className={slotClass(ctx, "slot", zone, index)} data-z={`${zone}:${index}`}>
       {placed ? <Placed ctx={ctx} placed={placed} zone={zone} /> : <span className="zlabel">{label}</span>}
+      <ChainBadges ctx={ctx} zone={zone} index={index} />
     </div>
   );
 }
@@ -37,16 +63,17 @@ function Slot({ ctx, placed, zone, label }: { ctx: Ctx; placed: PlacedCard | nul
 function Pile({ ctx, pile, zone, label, hidden }: { ctx: Ctx; pile: PlacedCard[]; zone: Zone; label: string; hidden?: boolean }) {
   const top = pile.at(-1);
   return (
-    <div className="slot pile" title={`${label}（${pile.length}）`}>
+    <div className={slotClass(ctx, "slot pile", zone)} title={`${label}（${pile.length}）`} data-z={zone}>
       {top ? <Placed ctx={ctx} placed={top} zone={zone} hidden={hidden} /> : <span className="zlabel">{label}</span>}
       {pile.length > 0 && <span className="count">{pile.length}</span>}
+      <ChainBadges ctx={ctx} zone={zone} />
     </div>
   );
 }
 
-function Deck({ count, label }: { count: number; label: string }) {
+function Deck({ count, label, mine }: { count: number; label: string; mine?: boolean }) {
   return (
-    <div className="slot pile" title={`${label}（${count}）`}>
+    <div className="slot pile" title={`${label}（${count}）`} data-z={mine ? "deck" : undefined}>
       {count > 0 ? (
         <div className="card">
           <div className="back" />
@@ -95,25 +122,25 @@ export function Field({ board, ...ctx }: Props) {
           <div className="divider" />
           <Empty label="除外" />
           <Gap />
-          <Slot ctx={ctx} placed={board.emz[0]} zone="emz" label="额外怪兽" />
+          <Slot ctx={ctx} placed={board.emz[0]} zone="emz" index={0} label="额外怪兽" />
           <Gap />
-          <Slot ctx={ctx} placed={board.emz[1]} zone="emz" label="额外怪兽" />
+          <Slot ctx={ctx} placed={board.emz[1]} zone="emz" index={1} label="额外怪兽" />
           <Gap />
           <Pile ctx={ctx} pile={board.banished} zone="banished" label="除外" />
           <div className="divider" />
 
           {/* 自己怪兽行：场地 | 怪兽×5 | 墓地 */}
-          <Slot ctx={ctx} placed={board.field_zone[0]} zone="field_zone" label="场地" />
+          <Slot ctx={ctx} placed={board.field_zone[0]} zone="field_zone" index={0} label="场地" />
           {FIVE.map((i) => (
-            <Slot key={`m${i}`} ctx={ctx} placed={board.monster[i]} zone="monster" label="怪兽" />
+            <Slot key={`m${i}`} ctx={ctx} placed={board.monster[i]} zone="monster" index={i} label="怪兽" />
           ))}
           <Pile ctx={ctx} pile={board.gy} zone="gy" label="墓地" />
           {/* 自己魔陷行：额外卡组 | 魔陷×5 | 卡组 */}
           <Pile ctx={ctx} pile={board.extra} zone="extra" label="额外" hidden />
           {FIVE.map((i) => (
-            <Slot key={`s${i}`} ctx={ctx} placed={board.spell_trap[i]} zone="spell_trap" label="魔陷" />
+            <Slot key={`s${i}`} ctx={ctx} placed={board.spell_trap[i]} zone="spell_trap" index={i} label="魔陷" />
           ))}
-          <Deck count={board.deckCount} label="卡组" />
+          <Deck count={board.deckCount} label="卡组" mine />
           <div className="side-label">自己</div>
         </div>
       </div>
@@ -121,8 +148,9 @@ export function Field({ board, ...ctx }: Props) {
       <div className="hand-row">
         <span className="label">手卡（{board.hand.length + board.otherHand} 张）</span>
         {board.hand.map((p, i) => (
-          <div className="slot" key={`${p.card.id}-${i}`}>
+          <div className={slotClass(ctx, "slot", "hand", i)} key={`${p.card.id}-${i}`} data-z={`hand:${i}`}>
             <Placed ctx={ctx} placed={p} zone="hand" />
+            <ChainBadges ctx={ctx} zone="hand" index={i} />
           </div>
         ))}
         {Array.from({ length: board.otherHand }, (_, i) => (

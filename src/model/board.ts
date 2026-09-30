@@ -55,7 +55,7 @@ export function initialBoard(combo: Combo): Board {
   };
 }
 
-const clone = (b: Board): Board => ({
+export const clone = (b: Board): Board => ({
   ...b,
   monster: [...b.monster],
   emz: [...b.emz],
@@ -69,12 +69,22 @@ const clone = (b: Board): Board => ({
 
 export class BoardError extends Error {}
 
+/** 卡在场地上的位置：有格子的区域和手卡带序号，卡组、墓地、除外、额外卡组只看区域。 */
+export interface Loc {
+  zone: Zone;
+  index?: number;
+}
+
 function take(b: Board, m: Move): PlacedCard {
+  return takeAt(b, m)[0];
+}
+
+function takeAt(b: Board, m: Move): [PlacedCard, Loc] {
   const { from, card } = m;
   if (from === "deck") {
     if (b.deckCount <= 0) throw new BoardError(`卡组已经没有卡了，无法取出 ${card.name}`);
     b.deckCount -= 1;
-    return { card };
+    return [{ card }, { zone: "deck" }];
   }
   if (isSlotted(from)) {
     const slots = b[from];
@@ -82,20 +92,20 @@ function take(b: Board, m: Move): PlacedCard {
     if (i < 0) throw new BoardError(`${zoneName(from)}里没有 ${card.name}`);
     const placed = slots[i]!;
     slots[i] = null;
-    return placed;
+    return [placed, { zone: from, index: i }];
   }
   const pile = b[from];
   const i = pile.findIndex((p) => p.card.id === card.id);
   if (i < 0) throw new BoardError(`${zoneName(from)}里没有 ${card.name}`);
-  return pile.splice(i, 1)[0];
+  return [pile.splice(i, 1)[0], from === "hand" ? { zone: from, index: i } : { zone: from }];
 }
 
-function put(b: Board, m: Move, placed: PlacedCard) {
+function put(b: Board, m: Move, placed: PlacedCard): Loc {
   const card: PlacedCard = { card: placed.card, faceDown: m.faceDown, defense: m.defense };
   const { to } = m;
   if (to === "deck") {
     b.deckCount += 1;
-    return;
+    return { zone: "deck" };
   }
   if (isSlotted(to)) {
     const slots = b[to];
@@ -103,10 +113,30 @@ function put(b: Board, m: Move, placed: PlacedCard) {
     if (i < 0 || i >= slots.length) throw new BoardError(`${zoneName(to)}已满，放不下 ${card.card.name}`);
     if (slots[i]) throw new BoardError(`${zoneName(to)}第 ${i + 1} 格已经有 ${slots[i]!.card.name}`);
     slots[i] = card;
-    return;
+    return { zone: to, index: i };
   }
   // 墓地、除外、手卡：新来的放在最上面（数组末尾）。
   b[to].push(card);
+  return to === "hand" ? { zone: to, index: b.hand.length - 1 } : { zone: to };
+}
+
+/** 在局面上执行一次移动（直接修改 b），返回卡从哪里来、到了哪里。 */
+export function applyMove(b: Board, m: Move): { from: Loc; to: Loc } {
+  const [placed, from] = takeAt(b, m);
+  return { from, to: put(b, m, placed) };
+}
+
+/** 找一张卡现在在哪：先看给定区域，找不到再找全场。 */
+export function locate(b: Board, id: number, prefer?: Zone): Loc | null {
+  const zones: Zone[] = ["hand", "monster", "emz", "spell_trap", "field_zone", "gy", "banished", "extra"];
+  for (const zone of prefer ? [prefer, ...zones.filter((z) => z !== prefer)] : zones) {
+    if (zone === "deck") continue;
+    const list = b[zone as Exclude<Zone, "deck">] as Array<PlacedCard | null>;
+    const i = list.findIndex((p) => p?.card.id === id);
+    if (i < 0) continue;
+    return isSlotted(zone) || zone === "hand" ? { zone, index: i } : { zone };
+  }
+  return prefer === "deck" ? { zone: "deck" } : null;
 }
 
 /** 计算每一步之后的局面。第 0 帧是起手局面。 */

@@ -68,6 +68,11 @@ function summonMethod(data: EngineData, code: number, from: Zone, normal: boolea
   return "special";
 }
 
+/** 并到别的步骤里的移动：原来记的时点对那一步没有意义，去掉（播放时放在最后）。 */
+function untimed({ afterAction: _a, resolving: _r, ...m }: Move): Move {
+  return m;
+}
+
 export interface ExportOptions {
   title?: string;
   deck?: string;
@@ -96,6 +101,11 @@ export function toCombo(session: DuelSession, opts: ExportOptions = {}): Combo {
     const moves: Move[] = [];
     const notes: string[] = [];
     const actions: StepAction[] = [];
+    // 记下每次移动发生在第几个动作之后、正在处理哪一环连锁，播放时按这个顺序演示
+    const when = (): Pick<Move, "afterAction" | "resolving"> => ({
+      afterAction: actions.length,
+      ...(resolving !== null && { resolving }),
+    });
     // 连锁序号 → 那一环的发动（效果处理期间的移动给它加标签）
     const byLink = new Map<number, Extract<StepAction, { type: "activate" }>["activation"]>();
     let resolving: number | null = null;
@@ -104,7 +114,7 @@ export function toCombo(session: DuelSession, opts: ExportOptions = {}): Combo {
 
     for (const t of entries) {
       if (t.kind === "draw" && t.player === 0) {
-        for (const code of t.codes) moves.push({ card: ref(code), from: "deck", to: "hand" });
+        for (const code of t.codes) moves.push({ card: ref(code), from: "deck", to: "hand", ...when() });
         if (resolving !== null) byLink.get(resolving)?.effects.push("draw");
       } else if (t.kind === "chain" && t.controller === 0) {
         const c = data.cards.get(t.code);
@@ -116,7 +126,7 @@ export function toCombo(session: DuelSession, opts: ExportOptions = {}): Combo {
             kind = c.type & TYPE.TRAP ? "trap_card" : "spell_card";
           } else kind = "spell_trap_effect";
         }
-        const activation: Extract<StepAction, { type: "activate" }>["activation"] = { card: ref(t.code), from, kind, effects: [] };
+        const activation: Extract<StepAction, { type: "activate" }>["activation"] = { card: ref(t.code), from, kind, chainLink: t.link, effects: [] };
         byLink.set(t.link, activation);
         actions.push({ type: "activate", activation });
       } else if (t.kind === "solving") {
@@ -133,14 +143,14 @@ export function toCombo(session: DuelSession, opts: ExportOptions = {}): Combo {
         if (m.from.location === m.to.location && !(m.from.location & OVERLAY)) continue; // 同一区域内换格子、改变表示形式
         if (m.to.location & OVERLAY && m.from.location === OcgLocation.MZONE && m.from.controller === 0) {
           // 超量素材：combo 格式没有素材区，记在墓地
-          moves.push({ card: ref(m.code), from: zoneOf(m.from)!.zone, to: "gy" });
+          moves.push({ card: ref(m.code), from: zoneOf(m.from)!.zone, to: "gy", ...when() });
           notes.push(`${data.name(m.code)} 成为超量素材（场地里记在墓地）`);
           continue;
         }
         if (m.from.location & OVERLAY) {
           if (m.to.location === OcgLocation.GRAVE) continue; // 素材已经记在墓地
           const to = zoneOf(m.to);
-          if (to && m.to.controller === 0) moves.push({ card: ref(m.code), from: "gy", to: to.zone, slot: to.slot });
+          if (to && m.to.controller === 0) moves.push({ card: ref(m.code), from: "gy", to: to.zone, slot: to.slot, ...when() });
           continue;
         }
         const from = zoneOf(m.from);
@@ -151,6 +161,7 @@ export function toCombo(session: DuelSession, opts: ExportOptions = {}): Combo {
         const onField = to.zone === "monster" || to.zone === "emz" || to.zone === "spell_trap" || to.zone === "field_zone";
         if (onField && m.to.position & POS_FACEDOWN) move.faceDown = true;
         if ((to.zone === "monster" || to.zone === "emz") && m.to.position & POS_DEFENSE) move.defense = true;
+        Object.assign(move, when());
         moves.push(move);
         if (from.zone === "hand" && (to.zone === "spell_trap" || to.zone === "field_zone")) placedFromHand.add(m.code);
         if (from.zone === "deck") usedDeck.push(m.code);
@@ -175,12 +186,12 @@ export function toCombo(session: DuelSession, opts: ExportOptions = {}): Combo {
     }
 
     if (action.label === "结束回合" || action.label === "进入战斗阶段") {
-      if (steps.length) steps.at(-1)!.moves.push(...moves);
+      if (steps.length) steps.at(-1)!.moves.push(...moves.map(untimed));
       return;
     }
     if (!actions.length) {
       // 盖放魔陷、改变表示形式：combo 格式里没有对应的动作，并到相邻的步骤里
-      carry.push(...moves);
+      carry.push(...moves.map((m) => ({ ...untimed(m), afterAction: 0 })));
       carryTitle.push(action.label);
       return;
     }
@@ -213,7 +224,7 @@ export function toCombo(session: DuelSession, opts: ExportOptions = {}): Combo {
     carry = [];
     carryTitle = [];
   });
-  if (carry.length && steps.length) steps.at(-1)!.moves.push(...carry);
+  if (carry.length && steps.length) steps.at(-1)!.moves.push(...carry.map(untimed));
 
   const [me] = session.field();
   const board = [...me.monsters, ...me.spells].filter((c): c is NonNullable<typeof c> => c !== null);
