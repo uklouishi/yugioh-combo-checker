@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { handtraps } from "../data";
-import { isExtraDeckCard, type EngineData } from "../engine/data";
+import { FORMATS, isExtraDeckCard, type EngineData, type Format } from "../engine/data";
 import { DeckParseError, parseDeck, toYdk, type Deck } from "../engine/deck";
 import type { DuelSetup } from "../engine/session";
 import { CardView } from "../ui/CardView";
@@ -13,7 +13,11 @@ interface Saved {
   mode: "random" | "pick";
   hand: number[];
   opponent: number[];
+  format?: Format;
 }
+
+const FORMAT_LABEL: Record<Format, string> = { tcg: "TCG", ocg: "OCG" };
+const LIMIT_LABEL = ["禁止", "限制", "准限制"];
 
 /** Called by the Grave 是速攻魔法，对手回合只能从盖放发动，默认不放。 */
 const DEFAULT_OPPONENT = handtraps.filter((h) => h.id !== 24224830).map((h) => h.id);
@@ -52,6 +56,8 @@ export function DeckSetup({ data, onStart }: Props) {
   const [mode, setMode] = useState<"random" | "pick">(saved?.mode ?? "random");
   const [hand, setHand] = useState<number[]>(saved?.hand ?? []);
   const [opponent, setOpponent] = useState<number[]>(saved?.opponent ?? DEFAULT_OPPONENT);
+  const [format, setFormat] = useState<Format>(saved?.format ?? "tcg");
+  const legal = (id: number) => data.limit(format, id) > 0;
   const [clipError, setClipError] = useState<string | null>(null);
 
   const parsed = useMemo((): { deck: Deck | null; error: string | null } => {
@@ -90,7 +96,15 @@ export function DeckSetup({ data, onStart }: Props) {
     });
   }, [hand, deck]);
 
-  useEffect(() => save({ text, mode, hand: validHand, opponent }), [text, mode, validHand, opponent]);
+  useEffect(() => save({ text, mode, hand: validHand, opponent, format }), [text, mode, validHand, opponent, format]);
+
+  // 牌组里超出禁卡表的卡（只提示，不阻止练习）
+  const overLimit = useMemo(() => {
+    if (!deck) return [];
+    return [...count([...deck.main, ...deck.extra])]
+      .map(([id, n]) => ({ id, n, max: data.limit(format, id) }))
+      .filter((c) => c.n > c.max);
+  }, [deck, data, format]);
 
   const paste = async () => {
     setClipError(null);
@@ -116,7 +130,7 @@ export function DeckSetup({ data, onStart }: Props) {
       main: deck.main,
       extra: deck.extra,
       hand: mode === "pick" ? validHand : null,
-      opponentHand: opponent,
+      opponentHand: opponent.filter(legal),
       seed: Math.floor(Math.random() * 2 ** 31),
     });
   };
@@ -127,8 +141,22 @@ export function DeckSetup({ data, onStart }: Props) {
   return (
     <div className="setup">
       <section className="panel">
+        <h2 className="section-title">1. 禁卡表</h2>
+        <div className="seg" role="radiogroup" aria-label="禁卡表">
+          {FORMATS.map((f) => (
+            <label key={f} className={format === f ? "on" : undefined}>
+              <input type="radio" name="format" checked={format === f} onChange={() => setFormat(f)} />
+              {FORMAT_LABEL[f]}
+              {data.banlists[f] && <span className="muted">（{data.banlists[f]!.name.replace(/\s*(TCG|OCG)$/, "")}）</span>}
+            </label>
+          ))}
+        </div>
+        <p className="muted">对手的手坑按这个禁卡表来：禁止卡不会放进对手手里。牌组里超出限制的卡会提示。</p>
+      </section>
+
+      <section className="panel">
         <div className="sub-head">
-          <h2 className="section-title">1. 导入牌组</h2>
+          <h2 className="section-title">2. 导入牌组</h2>
           <div className="adds">
             <button className="btn" onClick={paste}>
               从剪贴板粘贴
@@ -155,6 +183,12 @@ export function DeckSetup({ data, onStart }: Props) {
               主卡组 {deck.main.length} 张 · 额外卡组 {deck.extra.length} 张
               {mode === "pick" && " · 点主卡组的卡加入起手"}
             </p>
+            {overLimit.length > 0 && (
+              <p className="errors-inline">
+                按 {FORMAT_LABEL[format]} 禁卡表，这些卡超出限制：
+                {overLimit.map((c) => `${data.name(c.id)}（${c.n} 张，${c.max === 0 ? "禁止" : `最多 ${c.max} 张`}）`).join("、")}。可以照样练习。
+              </p>
+            )}
             {deck.unknown.length > 0 && (
               <p className="errors-inline">
                 有 {deck.unknown.length} 张卡规则引擎里还没有（卡号 {[...new Set(deck.unknown)].join("、")}），会被跳过。
@@ -187,7 +221,7 @@ export function DeckSetup({ data, onStart }: Props) {
       </section>
 
       <section className="panel">
-        <h2 className="section-title">2. 起手</h2>
+        <h2 className="section-title">3. 起手</h2>
         <div className="seg" role="radiogroup" aria-label="起手方式">
           <label className={mode === "random" ? "on" : undefined}>
             <input type="radio" name="mode" checked={mode === "random"} onChange={() => setMode("random")} />
@@ -214,15 +248,23 @@ export function DeckSetup({ data, onStart }: Props) {
       </section>
 
       <section className="panel">
-        <h2 className="section-title">3. 对手手里的手坑</h2>
+        <h2 className="section-title">4. 对手手里的手坑</h2>
         <p className="muted">对手每次能连锁这些卡时，悬浮窗会提示吃坑点。你可以随时回到那个时点，让对手真的发动。</p>
         <div className="chips-edit">
           {handtraps.map((h) => {
+            const limit = data.limit(format, h.id);
+            if (limit === 0)
+              return (
+                <span key={h.id} className="tag-toggle banned" title={`${FORMAT_LABEL[format]} 禁止卡`}>
+                  {h.name} <span className="limit">禁止</span>
+                </span>
+              );
             const on = opponent.includes(h.id);
             return (
               <label key={h.id} className={`tag-toggle${on ? " on" : ""}`} title={h.summary}>
                 <input type="checkbox" checked={on} onChange={() => setOpponent(on ? opponent.filter((x) => x !== h.id) : [...opponent, h.id])} />
                 {h.name}
+                {limit < 3 && <span className="limit">{LIMIT_LABEL[limit]}</span>}
               </label>
             );
           })}

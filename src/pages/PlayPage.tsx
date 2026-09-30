@@ -3,6 +3,7 @@ import { loadEngineData, type EngineData } from "../engine/data";
 import type { DuelSetup, FieldCard } from "../engine/session";
 import { DeckSetup } from "../play/DeckSetup";
 import { DuelField, locKey, type CardLoc } from "../play/DuelField";
+import { GainsPanel } from "../play/GainsPanel";
 import { HitWindow } from "../play/HitWindow";
 import { PromptPanel } from "../play/PromptPanel";
 import { useDuel } from "../play/useDuel";
@@ -150,6 +151,7 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
               <p className="errors-inline">引擎出错：{session.errors.at(-1)}</p>
             </section>
           )}
+          <GainsPanel data={data} gains={session.gains} actions={session.actions} oppHand={opp.hand.length} />
           <section className="log">
             <h2>操作记录</h2>
             <ol ref={logRef}>

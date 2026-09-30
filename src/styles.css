@@ -435,6 +435,7 @@ textarea { width: 100%; min-height: 72px; resize: vertical; }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; justify-self: start; }
 .seg label { padding: 6px 14px; cursor: pointer; }
 .seg label.on { background: var(--accent); color: #fff; }
+.seg label.on .muted { color: inherit; opacity: 0.8; }
 .seg input { position: absolute; opacity: 0; pointer-events: none; }
 .seg label:focus-within { outline: 2px solid var(--accent); outline-offset: -2px; }
 .start-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -497,6 +498,17 @@ button.slot:disabled { cursor: default; }
 .log-action { font-weight: 700; }
 .log ul { margin: 2px 0 0; padding-left: 14px; color: var(--muted); }
 .log li.opp { color: var(--stop); }
+
+/* 对手收益（Maxx "C" 类手坑） */
+.gains { background: var(--surface); border: 2px solid var(--stop); border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; font-size: 13px; }
+.gains header { display: flex; align-items: center; gap: 8px; }
+.gains h2 { margin: 0; font: 700 14px var(--display); }
+.gains p { margin: 0; }
+.gains ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 24vh; overflow-y: auto; font-size: 12px; }
+.gains ul { margin: 2px 0 0; padding-left: 14px; color: var(--muted); }
+.gains-total { font-weight: 700; color: var(--stop); }
+.tag-toggle.banned { opacity: 0.45; cursor: not-allowed; text-decoration: line-through; }
+.tag-toggle .limit { font: 700 10px var(--mono); opacity: 0.8; }
 
 /* 吃坑点悬浮窗 */
 .hit-window {
