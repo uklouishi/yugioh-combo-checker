@@ -109,11 +109,11 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
         <button className="btn" onClick={duel.undo} disabled={busy || session.ownResponseIndices().length === 0}>
           撤销
         </button>
-        <button className="btn" onClick={() => void duel.run(session.setup)} disabled={busy}>
+        <button className="btn" onClick={() => void duel.run(session.setup)} disabled={busy} title="用同一手牌从头开始">
           重来
         </button>
         {!session.setup.hand && (
-          <button className="btn" onClick={() => void duel.run({ ...session.setup, seed: Math.floor(Math.random() * 2 ** 31) })} disabled={busy}>
+          <button className="btn" onClick={() => void duel.run({ ...session.setup, seed: Math.floor(Math.random() * 2 ** 31) })} disabled={busy} title="重新洗牌抽 5 张">
             换一手
           </button>
         )}
