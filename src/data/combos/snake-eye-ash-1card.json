@@ -1,7 +1,7 @@
 {
   "id": "snake-eye-ash-1card",
   "deck": "Snake-Eye",
-  "title": "蛇眼 Ash 单卡起手：公主 + 焰剑龙",
+  "title": "Snake-Eye Ash 单卡起手：Promethean Princess + Flamberge",
   "format": "TCG",
   "updatedAt": "2026-09-30",
   "sources": [
@@ -113,17 +113,17 @@
         {
           "handtrap": 10045474,
           "impact": "combo_ends",
-          "note": "同灰流丽：Ash 被无效后拿不到 Poplar。"
+          "note": "同 Ash Blossom：Ash 被无效后拿不到 Poplar。"
         },
         {
           "handtrap": 97268402,
           "impact": "combo_ends",
-          "note": "同灰流丽：Ash 被无效后拿不到 Poplar。"
+          "note": "同 Ash Blossom：Ash 被无效后拿不到 Poplar。"
         },
         {
           "handtrap": 59438930,
           "impact": "reduced_endboard",
-          "note": "幽鬼兔只破坏 Ash，检索照常处理；少一个素材，出不了三素材的公主。"
+          "note": "Ghost Ogre 只破坏 Snake-Eye Ash，检索照常处理；少一个素材，出不了三素材的 Promethean Princess。"
         },
         {
           "handtrap": 94145021,
@@ -178,7 +178,7 @@
         {
           "handtrap": 23434538,
           "impact": "reduced_endboard",
-          "note": "后面还有 5 次特召，全打完对手多抽 5 张。可以考虑只做到公主就停。"
+          "note": "后面还有 5 次特召，全打完对手多抽 5 张。可以考虑只做到 Promethean Princess 就停。"
         }
       ]
     },
@@ -222,7 +222,7 @@
         {
           "handtrap": 14558127,
           "impact": "reroute",
-          "note": "拿不到罪宝魔法。改用 Ash ②：送 Ash + Poplar，从卡组特召 Oak，Oak 再苏生 Poplar。"
+          "note": "拿不到 Original Sinful Spoils - Snake-Eye。改用 Ash ②：送 Ash + Poplar，从卡组特召 Oak，Oak 再苏生 Poplar。"
         },
         {
           "handtrap": 59438930,
@@ -360,7 +360,7 @@
         {
           "handtrap": 73642296,
           "impact": "reduced_endboard",
-          "note": "只剩 Ash + Oak 两只，出不了公主；可以用 Oak ② 送 Ash + Oak 直接从卡组拉 Flamberge。"
+          "note": "只剩 Ash + Oak 两只，出不了 Promethean Princess；可以用 Oak ② 送 Ash + Oak 直接从卡组拉 Flamberge。"
         }
       ]
     },
@@ -429,12 +429,12 @@
           "slot": 0
         }
       ],
-      "notes": "从这里开始只能特召炎属性怪兽（公主的限制）。",
+      "notes": "从这里开始只能特召炎属性怪兽（Promethean Princess 的限制）。",
       "interruptions": [
         {
           "handtrap": 27204311,
           "impact": "minor",
-          "note": "第 5 次召唤时场上只有公主一只，尼比鲁收益很低；对手更可能等到 Flamberge 出场后再丢。"
+          "note": "第 5 次召唤时场上只有 Promethean Princess 一只，Nibiru 收益很低；对手更可能等到 Flamberge 出场后再丢。"
         }
       ]
     },
@@ -486,7 +486,7 @@
     },
     {
       "id": "s9",
-      "title": "公主 ①：从墓地特召 Snake-Eye Oak",
+      "title": "Promethean Princess ①：从墓地特召 Snake-Eye Oak",
       "actions": [
         {
           "type": "activate",
@@ -596,25 +596,25 @@
         {
           "handtrap": 14558127,
           "impact": "reduced_endboard",
-          "note": "终场只剩公主。"
+          "note": "终场只剩 Promethean Princess。"
         },
         {
           "handtrap": 10045474,
           "applies": false,
           "impact": "minor",
-          "note": "Oak 已作为 cost 离场，泡影没有对象可以无效这次发动。"
+          "note": "Oak 已作为 cost 离场，Infinite Impermanence 没有对象可以无效这次发动。"
         },
         {
           "handtrap": 97268402,
           "applies": false,
           "impact": "minor",
-          "note": "Oak 已作为 cost 离场，遮蒙者没有对象。"
+          "note": "Oak 已作为 cost 离场，Effect Veiler 没有对象。"
         },
         {
           "handtrap": 59438930,
           "applies": false,
           "impact": "minor",
-          "note": "Oak 已不在场上，幽鬼兔破坏不到。"
+          "note": "Oak 已不在场上，Ghost Ogre 破坏不到。"
         }
       ]
     }
@@ -630,6 +630,6 @@
         "name": "Snake-Eyes Flamberge Dragon"
       }
     ],
-    "description": "公主 + Flamberge。Flamberge 对手回合可以把当作永续魔法的怪兽特召到自己场上；公主在墓地时，对手特召会触发破坏并自身复活。"
+    "description": "Promethean Princess + Snake-Eyes Flamberge Dragon。Flamberge 对手回合可以把当作永续魔法的怪兽特召到自己场上；Promethean Princess 在墓地时，对手特召会触发破坏并自身复活。"
   }
 }

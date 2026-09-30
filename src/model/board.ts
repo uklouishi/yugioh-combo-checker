@@ -141,3 +141,22 @@ export function zoneName(z: Zone): string {
     banished: "除外区",
   }[z];
 }
+
+/** 编辑时用：遇到错误就停下，返回已经算出的局面和错误信息。 */
+export function simulatePartial(combo: Combo): { frames: Frame[]; error?: string } {
+  let board = initialBoard(combo);
+  const frames: Frame[] = [{ stepIndex: -1, board, moved: [] }];
+  for (const [stepIndex, step] of combo.steps.entries()) {
+    board = clone(board);
+    for (const m of step.moves) {
+      try {
+        put(board, m, take(board, m));
+      } catch (e) {
+        if (e instanceof BoardError) return { frames, error: `步骤 ${stepIndex + 1}：${e.message}` };
+        throw e;
+      }
+    }
+    frames.push({ stepIndex, board, moved: step.moves });
+  }
+  return { frames };
+}

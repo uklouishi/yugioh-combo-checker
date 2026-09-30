@@ -45,6 +45,11 @@ export class CardStore {
     return this.cards.get(id);
   }
 
+  /** 已缓存的全部卡（去掉异画重复）。 */
+  all(): CardInfo[] {
+    return [...new Map([...this.cards.values()].map((c) => [c.id, c])).values()];
+  }
+
   add(cards: CardInfo[]) {
     for (const c of cards) {
       this.cards.set(c.id, c);
