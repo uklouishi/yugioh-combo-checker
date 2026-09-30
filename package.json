@@ -14,7 +14,7 @@
     "sync-engine": "tsx scripts/sync-engine.ts"
   },
   "dependencies": {
-    "ocgcore-wasm": "^0.1.2",
+    "ocgcore-wasm": "npm:@jsr/n1xx1__ocgcore-wasm@^0.1.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "zod": "^4.6.5"

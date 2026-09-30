@@ -12,7 +12,8 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["node", "vite/client"]
+    "types": ["node", "vite/client"],
+    "paths": { "ocgcore-wasm": ["./node_modules/ocgcore-wasm/dist/index.d.ts"] }
   },
   "include": ["src", "scripts", "vite.config.ts"]
 }

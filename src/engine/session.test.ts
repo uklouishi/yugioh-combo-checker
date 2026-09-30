@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import createCore, { OcgMessageType, OcgResponseType, type OcgCoreSync } from "ocgcore-wasm";
+import createCore, { OcgLocation, OcgMessageType, OcgPosition, OcgResponseType, type OcgCoreSync } from "ocgcore-wasm";
 import { beforeAll, describe, expect, it } from "vitest";
 import { EngineData } from "./data";
 import { activateAt, startDuel, undoResponses } from "./run";
@@ -16,6 +16,8 @@ const OSS = 89023486;
 const PRINCESS = 2772337;
 const ASH_BLOSSOM = 14558127;
 const MAXX_C = 23434538;
+const ECCLESIA_DARK_DRAGON = 78397661;
+const ALBAZ = 68468459; // Fallen of Albaz
 
 const setup: DuelSetup = {
   main: [ASH, POPLAR, OAK, FLAMBERGE, OSS, ...Array(35).fill(OAK)],
@@ -112,6 +114,34 @@ describe("DuelSession", () => {
     for (let seed = 1; seed <= 6; seed++) hands.add(await handOf(seed));
     expect(hands.size).toBeGreaterThan(1);
     expect(await handOf(3)).toBe(await handOf(3));
+  });
+
+  it("resolves effects that register new effects mid-resolution (Ecclesia and the Dark Dragon)", async () => {
+    // 开局直接把额外卡组的 Ecclesia 放到怪兽区，省掉同调召唤
+    const onField = new Proxy(core, {
+      get(t, k) {
+        if (k === "duelNewCard")
+          return (h: Parameters<OcgCoreSync["duelNewCard"]>[0], c: Parameters<OcgCoreSync["duelNewCard"]>[1]) =>
+            t.duelNewCard(h, c.code === ECCLESIA_DARK_DRAGON ? { ...c, location: OcgLocation.MZONE, sequence: 2, position: OcgPosition.FACEUP_ATTACK } : c);
+        const v = t[k as keyof OcgCoreSync];
+        return typeof v === "function" ? v.bind(t) : v;
+      },
+    });
+    const s = await startDuel(onField, data, { ...setup, main: [ALBAZ, ...Array(39).fill(OAK)], extra: [ECCLESIA_DARK_DRAGON], opponentHand: [] });
+    const m = idle(s);
+    s.respond({ type: OcgResponseType.SELECT_IDLECMD, action: 5, index: m.activates.findIndex((c) => c.code === ECCLESIA_DARK_DRAGON) });
+    while (s.status === "prompt" && s.prompt!.msg.type !== OcgMessageType.SELECT_IDLECMD) {
+      const p = s.prompt!.msg;
+      if (p.type === OcgMessageType.SELECT_CHAIN) s.respond({ type: OcgResponseType.SELECT_CHAIN, index: null });
+      else if (p.type === OcgMessageType.SELECT_CARD) s.respond({ type: OcgResponseType.SELECT_CARD, indicies: [p.selects.findIndex((c) => c.code === ALBAZ)] });
+      else if (p.type === OcgMessageType.SELECT_PLACE) s.respond({ type: OcgResponseType.SELECT_PLACE, places: [{ player: 0, location: 4, sequence: 1 }] });
+      else if (p.type === OcgMessageType.SELECT_POSITION) s.respond({ type: OcgResponseType.SELECT_POSITION, position: 1 });
+      else throw new Error(`unexpected prompt ${p.type}`);
+    }
+    expect(s.errors).toEqual([]);
+    const [me] = s.field();
+    expect(me.banished.map((c) => c.code)).toContain(ECCLESIA_DARK_DRAGON);
+    expect(me.monsters.some((c) => c?.code === ALBAZ)).toBe(true);
   });
 
   it("ends the turn and stops before the opponent acts", async () => {

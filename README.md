@@ -42,7 +42,7 @@ npm run sync-engine # 下载规则引擎用的卡片数据和效果脚本到 pub
 
 ## 规则引擎（`src/engine/`）
 
-练习页用的是 EDOPro 的 [ygopro-core](https://github.com/edo9300/ygopro-core)，通过 [ocgcore-wasm](https://github.com/n1xx1/ocgcore-wasm) 在浏览器里以 WebAssembly 运行。卡片效果来自 [ProjectIgnis CardScripts](https://github.com/ProjectIgnis/CardScripts) 的 Lua 脚本，卡片数值来自 [BabelCDB](https://github.com/ProjectIgnis/BabelCDB)，所以不需要为每张卡手写效果，检索、特召、连锁、时点、发动条件都按真实规则处理。这些项目以 AGPL-3.0 发布，网站原样使用，页面底部注明了来源。
+练习页用的是 EDOPro 的 [ygopro-core](https://github.com/edo9300/ygopro-core)，通过 [ocgcore-wasm](https://github.com/n1xx1/ocgcore-wasm) 在浏览器里以 WebAssembly 运行。ocgcore-wasm 从 JSR 安装（npm 上的版本太旧，跟最新的卡片脚本不兼容），`.npmrc` 里配置了 JSR 的 npm 源。卡片效果来自 [ProjectIgnis CardScripts](https://github.com/ProjectIgnis/CardScripts) 的 Lua 脚本，卡片数值来自 [BabelCDB](https://github.com/ProjectIgnis/BabelCDB)，所以不需要为每张卡手写效果，检索、特召、连锁、时点、发动条件都按真实规则处理。这些项目以 AGPL-3.0 发布，网站原样使用，页面底部注明了来源。
 
 - `scripts/sync-engine.ts` 生成 `public/engine/`：`cards.json`（卡片数值、英文卡名、效果说明文字）、`base.json`（公共脚本）、`scripts/c<卡号>.lua`（每张卡的脚本，按需下载）、`strings.json`（系统提示）。
 - `session.ts`：一局练习。自己先攻；对手的选择由简单的自动应答处理（连锁一律不发动，除非你在吃坑点让它发动）。所有回应都记录下来，撤销和「让对手发动」都是从头重放到某个位置，结果完全一致。
