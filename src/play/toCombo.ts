@@ -143,7 +143,8 @@ export function toCombo(session: DuelSession, opts: ExportOptions = {}): Combo {
         if (m.from.location === m.to.location && !(m.from.location & OVERLAY)) continue; // 同一区域内换格子、改变表示形式
         if (m.to.location & OVERLAY && m.from.location === OcgLocation.MZONE && m.from.controller === 0) {
           // 超量素材：combo 格式没有素材区，记在墓地
-          moves.push({ card: ref(m.code), from: zoneOf(m.from)!.zone, to: "gy", ...when() });
+          const src = zoneOf(m.from)!;
+          moves.push({ card: ref(m.code), from: src.zone, to: "gy", ...(src.slot !== undefined && { fromSlot: src.slot }), ...when() });
           notes.push(`${data.name(m.code)} 成为超量素材（场地里记在墓地）`);
           continue;
         }
@@ -158,6 +159,7 @@ export function toCombo(session: DuelSession, opts: ExportOptions = {}): Combo {
         if (!from || !to || m.to.controller !== 0 || m.from.controller !== 0) continue;
         const move: Move = { card: ref(m.code), from: from.zone, to: to.zone };
         if (to.slot !== undefined) move.slot = to.slot;
+        if (from.slot !== undefined) move.fromSlot = from.slot;
         const onField = to.zone === "monster" || to.zone === "emz" || to.zone === "spell_trap" || to.zone === "field_zone";
         if (onField && m.to.position & POS_FACEDOWN) move.faceDown = true;
         if ((to.zone === "monster" || to.zone === "emz") && m.to.position & POS_DEFENSE) move.defense = true;

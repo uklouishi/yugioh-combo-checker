@@ -88,7 +88,12 @@ function takeAt(b: Board, m: Move): [PlacedCard, Loc] {
   }
   if (isSlotted(from)) {
     const slots = b[from];
-    const i = m.slot !== undefined && slots[m.slot]?.card.id === card.id ? m.slot : slots.findIndex((p) => p?.card.id === card.id);
+    const i =
+      m.fromSlot !== undefined && slots[m.fromSlot]?.card.id === card.id
+        ? m.fromSlot
+        : m.slot !== undefined && slots[m.slot]?.card.id === card.id
+          ? m.slot
+          : slots.findIndex((p) => p?.card.id === card.id);
     if (i < 0) throw new BoardError(`${zoneName(from)}里没有 ${card.name}`);
     const placed = slots[i]!;
     slots[i] = null;

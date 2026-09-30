@@ -142,6 +142,8 @@ export const Move = z.object({
   from: Zone,
   to: Zone,
   slot: z.number().int().min(0).max(4).optional(),
+  /** 从有格子的区域移走时，原来在第几格（同名卡在多个格子里时用来分清是哪一张）。 */
+  fromSlot: z.number().int().min(0).max(4).optional(),
   /** 里侧（盖放）。 */
   faceDown: z.boolean().optional(),
   /** 守备表示。 */

@@ -5,6 +5,7 @@ import { HomePage } from "./pages/HomePage";
 import { OpenPage } from "./pages/OpenPage";
 import { ViewPage } from "./pages/ViewPage";
 import { href, useRoute } from "./router";
+import { ErrorBoundary } from "./ui/ErrorBoundary";
 
 // 规则引擎约 1.2 MB，只在练习页加载
 const PlayPage = lazy(() => import("./pages/PlayPage"));
@@ -32,17 +33,20 @@ export function App() {
           ))}
         </nav>
       </header>
-      {route.page === "home" && <HomePage />}
-      {route.page === "play" && (
-        <Suspense fallback={<main className="page"><p className="muted">正在加载规则引擎…</p></main>}>
-          <PlayPage />
-        </Suspense>
-      )}
-      {route.page === "open" && <OpenPage />}
-      {route.page === "view" && <ViewPage key={route.id} id={route.id} initialStep={route.step} />}
-      {route.page === "analyze" && <AnalyzePage key={route.id ?? ""} id={route.id} />}
-      {route.page === "create" && <EditorPage key="new" />}
-      {route.page === "edit" && <EditorPage key={route.id} id={route.id} />}
+      {/* 换页时换一个新的 ErrorBoundary，上一页的错误不会留下来 */}
+      <ErrorBoundary key={`${route.page}:${"id" in route ? route.id : ""}`}>
+        {route.page === "home" && <HomePage />}
+        {route.page === "play" && (
+          <Suspense fallback={<main className="page"><p className="muted">正在加载规则引擎…</p></main>}>
+            <PlayPage />
+          </Suspense>
+        )}
+        {route.page === "open" && <OpenPage />}
+        {route.page === "view" && <ViewPage key={route.id} id={route.id} initialStep={route.step} />}
+        {route.page === "analyze" && <AnalyzePage key={route.id ?? ""} id={route.id} />}
+        {route.page === "create" && <EditorPage key="new" />}
+        {route.page === "edit" && <EditorPage key={route.id} id={route.id} />}
+      </ErrorBoundary>
     </>
   );
 }
