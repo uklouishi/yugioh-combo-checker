@@ -17,8 +17,23 @@ npm run sync-cards  # 从 YGOPRODeck 拉取用到的卡，生成 public/cards.js
   - `summon`：通常召唤 / 连接召唤等（计入尼比鲁次数）
   - `activate`：卡片发动。`from` 是发动时所在区域，`effects` 是效果里包含的处理标签（如 `add_from_deck`、`ss_from_gy`），`cost` 单独写
   - `resolve_summon`：效果处理带来的召唤
+- **moves**：这一步里卡片的移动（`card`、`from`、`to`，可选 `slot` 格子编号、`faceDown` 盖放、`defense` 守备），场地界面按顺序执行这些移动来画出每一步之后的局面。怪兽区/魔陷区格子 0-4 从左到右，额外怪兽区 0-1。
 - **interruptions**（可选）：作者对某张手坑的说明，`impact` 为 `combo_ends` / `reduced_endboard` / `reroute` / `minor`，可指向备用 step 或备用 combo；`applies: false` 表示自动推导说能打但实际打不了。
 - 卡牌一律用卡片密码 `id` 引用，`name` 只是为了可读，由校验脚本核对。
+
+- 起手手卡数 `handSize`（默认 5，starter 之外的显示为卡背）和主卡组张数 `deckSize`（默认 40）。
+
+## 网站功能
+
+- **场地界面**：双方各 5 个怪兽区和 5 个魔陷区，中间 2 个额外怪兽区；左边场地区和额外卡组，右边墓地、主卡组和除外。这一步移动过的卡会高亮，点任意一张卡可以查看效果。
+- **步骤悬浮窗**：右下角，可以拖动、可以收起。用 ◀ ▶ 或键盘左右方向键切换步骤，每一步列出能打的手坑和打断后的影响。
+- **上传 combo**：选择 JSON 文件或直接粘贴，校验通过后保存在本机浏览器（其他人看不到）。校验会检查字段、手坑编号和卡片移动是否对得上，错误用中文列出。
+
+## 部署
+
+推送到 main 后，GitHub Actions（`.github/workflows/deploy.yml`）会运行测试、从 YGOPRODeck 下载卡牌资料和卡图，然后发布到 GitHub Pages。第一次需要在仓库 Settings → Pages 里把 Source 设为 **GitHub Actions**。
+
+`public/cards.json` 是仓库里自带的离线卡牌资料（由 `scripts/cards-from-cdb.py` 从 ygopro 卡库生成），部署时会被 YGOPRODeck 的最新资料覆盖。本地没有卡图时，卡片显示为按类型着色的卡框和卡名。
 
 ## 吃坑推导（`src/model/interruptions.ts`）
 

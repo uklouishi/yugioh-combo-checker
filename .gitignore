@@ -2,3 +2,4 @@ node_modules
 dist
 *.cdb
 tsconfig.tsbuildinfo
+public/card-images
