@@ -10,9 +10,11 @@
     "test": "vitest run",
     "validate": "tsx scripts/validate-combos.ts",
     "sync-cards": "tsx scripts/sync-cards.ts",
-    "sync-all-images": "tsx scripts/sync-all-images.ts"
+    "sync-all-images": "tsx scripts/sync-all-images.ts",
+    "sync-engine": "tsx scripts/sync-engine.ts"
   },
   "dependencies": {
+    "ocgcore-wasm": "^0.1.2",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "zod": "^4.6.5"

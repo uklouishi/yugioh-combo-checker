@@ -34,6 +34,16 @@ export function HomePage() {
         <p className="lede">记录一条 combo 从起手到终场的每一步，自动标出 Ash Blossom、Maxx "C"、Nibiru 等手坑能在哪里打断你。</p>
       </section>
 
+      <a className="feature" href={href.play()}>
+        <div className="eyebrow">核心功能</div>
+        <h2>实战练习</h2>
+        <p>
+          粘贴 YDK 或 ydke:// 链接导入牌组，在场地上直接打出你的 combo。检索、特殊召唤、连锁和时点由 EDOPro 规则引擎按真实规则自动处理，不需要手动设置效果。
+        </p>
+        <p>对手手里放着手坑：每个能被打断的时点都会在悬浮窗里提示，还可以回到那一刻让对手真的发动，看被打断后怎么继续。</p>
+        <span className="cta">导入牌组开始 →</span>
+      </a>
+
       <section className="entries">
         {ENTRIES.map((e) => (
           <a key={e.to} className="entry" href={e.to}>

@@ -25,6 +25,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # 规则引擎的卡片数据和效果脚本（ProjectIgnis）写到 public/engine/，测试也要用
+      - run: npm run sync-engine
       - run: npm test
       - run: npm run validate
       # 从 YGOPRODeck 拉取卡牌资料并下载卡图到 public/card-images/

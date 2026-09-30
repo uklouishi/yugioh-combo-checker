@@ -3,3 +3,5 @@ dist
 *.cdb
 tsconfig.tsbuildinfo
 public/card-images
+.cache
+public/engine
