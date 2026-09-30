@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { href } from "../router";
 
 // 主菜单：每项前面的小卡用卡框颜色区分（效果怪兽 / 连接 / 魔法 / 陷阱）
@@ -92,25 +93,16 @@ export function HomePage() {
 
 function HowToPlay() {
   const [open, setOpen] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    const onDown = (e: PointerEvent) => {
-      if (box.current && !box.current.contains(e.target as Node))
-        setOpen(false);
-    };
     document.addEventListener("keydown", onKey);
-    document.addEventListener("pointerdown", onDown);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.removeEventListener("pointerdown", onDown);
-    };
+    return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
   return (
-    <div className="how-to" ref={box}>
+    <div className="how-to">
       <button
         type="button"
         className="help-btn"
@@ -120,35 +112,47 @@ function HowToPlay() {
       >
         ?
       </button>
-      {open && (
-        <div className="how-pop" role="dialog" aria-label="玩法说明">
-          <div className="how-head">
-            <b>HOW TO PLAY</b>
-            <button
-              type="button"
-              className="how-close"
-              aria-label="关闭"
-              onClick={() => setOpen(false)}
+      {open &&
+        // 挂到 body 上，在页面正中悬浮，不受主页布局影响；点遮罩或右上角 ✕ 关闭
+        createPortal(
+          <div className="how-overlay" onClick={() => setOpen(false)}>
+            <div
+              className="how-pop"
+              role="dialog"
+              aria-modal="true"
+              aria-label="玩法说明"
+              onClick={(e) => e.stopPropagation()}
             >
-              ✕
-            </button>
-          </div>
-          <ol>
-            {HOW_TO.map((s, i) => (
-              <li key={s.title} className={s.hit ? "is-hit" : undefined}>
-                <span className="chain-badge">
-                  <small>CHAIN</small>
-                  {i + 1}
-                </span>
-                <div>
-                  <b>{s.title}</b>
-                  <p>{s.body}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </div>
-      )}
+              <div className="how-head">
+                <b>HOW TO PLAY</b>
+                <button
+                  type="button"
+                  className="how-close"
+                  aria-label="关闭"
+                  onClick={() => setOpen(false)}
+                  autoFocus
+                >
+                  ✕
+                </button>
+              </div>
+              <ol>
+                {HOW_TO.map((s, i) => (
+                  <li key={s.title} className={s.hit ? "is-hit" : undefined}>
+                    <span className="chain-badge">
+                      <small>CHAIN</small>
+                      {i + 1}
+                    </span>
+                    <div>
+                      <b>{s.title}</b>
+                      <p>{s.body}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
