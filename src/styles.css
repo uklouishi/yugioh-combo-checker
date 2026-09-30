@@ -540,3 +540,9 @@ button.slot:disabled { cursor: default; }
   .hit-window { bottom: auto; top: calc(60px + env(safe-area-inset-top, 0px)); width: min(300px, calc(100vw - 24px)); }
 }
 .credits { font-size: 12px; margin: 0; }
+
+/* Fydraulis Harmonia 的同调怪兽设置 */
+.harmonia { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--accent); border-radius: 8px; display: grid; gap: 8px; }
+.harmonia p { margin: 0; }
+.harmonia .field { display: grid; gap: 4px; max-width: 420px; }
+.harmonia input { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: inherit; }

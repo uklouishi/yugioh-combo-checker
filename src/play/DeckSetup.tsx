@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { handtraps } from "../data";
-import { FORMATS, isExtraDeckCard, type EngineData, type Format } from "../engine/data";
+import { FORMATS, TYPE, isExtraDeckCard, type EngineData, type Format } from "../engine/data";
 import { DeckParseError, parseDeck, toYdk, type Deck } from "../engine/deck";
 import type { DuelSetup } from "../engine/session";
 import { CardView } from "../ui/CardView";
@@ -14,7 +14,13 @@ interface Saved {
   hand: number[];
   opponent: number[];
   format?: Format;
+  synchro?: number;
 }
+
+const HARMONIA = 70088809; // Fydraulis Harmonia
+const MALONG = 93125329; // Golden Cloud Beast - Malong
+/** 凑满 5 只同调给 Harmonia 展示用的白板同调。 */
+const GAIA_KNIGHT = 97204936;
 
 const FORMAT_LABEL: Record<Format, string> = { tcg: "TCG", ocg: "OCG" };
 const LIMIT_LABEL = ["禁止", "限制", "准限制"];
@@ -58,6 +64,17 @@ export function DeckSetup({ data, onStart }: Props) {
   const [opponent, setOpponent] = useState<number[]>(saved?.opponent ?? DEFAULT_OPPONENT);
   const [format, setFormat] = useState<Format>(saved?.format ?? "tcg");
   const legal = (id: number) => data.limit(format, id) > 0;
+  const [synchro, setSynchro] = useState<number>(saved?.synchro ?? MALONG);
+  const [synchroText, setSynchroText] = useState(() => data.name(saved?.synchro ?? MALONG));
+  const harmonia = opponent.includes(HARMONIA) && legal(HARMONIA);
+  const synchros = useMemo(
+    () =>
+      [...data.cards.values()]
+        .filter((c) => c.type & TYPE.SYNCHRO && !(c.type & TYPE.TOKEN) && !c.alias)
+        .map((c) => c.name)
+        .sort(),
+    [data],
+  );
   const [clipError, setClipError] = useState<string | null>(null);
 
   const parsed = useMemo((): { deck: Deck | null; error: string | null } => {
@@ -96,7 +113,7 @@ export function DeckSetup({ data, onStart }: Props) {
     });
   }, [hand, deck]);
 
-  useEffect(() => save({ text, mode, hand: validHand, opponent, format }), [text, mode, validHand, opponent, format]);
+  useEffect(() => save({ text, mode, hand: validHand, opponent, format, synchro }), [text, mode, validHand, opponent, format, synchro]);
 
   // 牌组里超出禁卡表的卡（只提示，不阻止练习）
   const overLimit = useMemo(() => {
@@ -131,6 +148,8 @@ export function DeckSetup({ data, onStart }: Props) {
       extra: deck.extra,
       hand: mode === "pick" ? validHand : null,
       opponentHand: opponent.filter(legal),
+      ...(harmonia && { opponentExtra: [synchro, ...Array(4).fill(GAIA_KNIGHT)], opponentSynchro: synchro }),
+      format,
       seed: Math.floor(Math.random() * 2 ** 31),
     });
   };
@@ -269,6 +288,35 @@ export function DeckSetup({ data, onStart }: Props) {
             );
           })}
         </div>
+        {harmonia && (
+          <div className="harmonia">
+            <p>
+              <strong>Fydraulis Harmonia</strong> 需要展示对手额外卡组的同调怪兽。请设置对手展示后送去墓地的那只同调怪兽，它送墓时的效果就是 Harmonia 之后的额外阻抗。
+            </p>
+            <label className="field">
+              <span>对手送墓的同调怪兽</span>
+              <input
+                list="synchro-list"
+                value={synchroText}
+                onChange={(e) => {
+                  setSynchroText(e.target.value);
+                  const c = [...data.cards.values()].find((x) => x.name === e.target.value && x.type & TYPE.SYNCHRO);
+                  if (c) setSynchro(c.code);
+                }}
+                onBlur={() => setSynchroText(data.name(synchro))}
+                spellCheck={false}
+              />
+              <datalist id="synchro-list">
+                {synchros.map((n) => (
+                  <option key={n} value={n} />
+                ))}
+              </datalist>
+            </label>
+            <p className="muted">
+              现在是 {data.name(synchro)}。对手额外卡组会放这只加 4 张 {data.name(GAIA_KNIGHT)}，凑满 5 只同调，这样 Harmonia 三个效果都能用：特召自身、送墓这只同调、破坏你 1 只怪兽。
+            </p>
+          </div>
+        )}
       </section>
 
       <div className="start-row">

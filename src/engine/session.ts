@@ -17,10 +17,11 @@ import {
   OcgResponseType,
   type OcgCoreSync,
   type OcgDuelHandle,
+  type OcgLocPos,
   type OcgMessage,
   type OcgResponse,
 } from "ocgcore-wasm";
-import type { EngineData } from "./data";
+import { isExtraDeckCard, type EngineData, type Format } from "./data";
 
 export interface DuelSetup {
   main: number[];
@@ -29,8 +30,25 @@ export interface DuelSetup {
   hand: number[] | null;
   /** 对手手卡（手坑）。 */
   opponentHand: number[];
+  /** 对手额外卡组（Fydraulis Harmonia 要展示的同调怪兽）。 */
+  opponentExtra?: number[];
+  /** 对手用 Fydraulis Harmonia 送去墓地的同调怪兽。 */
+  opponentSynchro?: number;
+  format?: Format;
   seed: number;
 }
+
+/**
+ * 引擎消息的简化记录，按操作分组，用来导出 combo 文件。
+ * link 是连锁序号；solving / solved 之间的移动属于那一环的效果处理。
+ */
+export type TraceEntry = { action: number } & (
+  | { kind: "move"; code: number; from: OcgLocPos; to: OcgLocPos }
+  | { kind: "draw"; player: number; codes: number[] }
+  | { kind: "chain"; code: number; controller: number; location: number; sequence: number; link: number }
+  | { kind: "solving" | "solved"; link: number }
+  | { kind: "summon"; code: number; controller: number; normal: boolean }
+);
 
 /** 对方每次召唤就抽卡的手坑（Maxx "C"、Mulcharmy）。 */
 export const DRAW_HANDTRAPS = new Set([23434538, 42141493, 84192580, 87126721]);
@@ -185,6 +203,7 @@ export class DuelSession {
   prompt: Prompt | null = null;
   lp: [number, number] = [8000, 8000];
   readonly gains: Gains = { activated: [], draws: [], returned: 0 };
+  readonly trace: TraceEntry[] = [];
 
   private handle: OcgDuelHandle | null = null;
   private ri = 0;
@@ -209,7 +228,7 @@ export class DuelSession {
 
   /** 这局需要的卡片脚本（开局前 prefetch）。 */
   static scriptsFor(setup: DuelSetup, data: EngineData): string[] {
-    const codes = [...setup.main, ...setup.extra, ...setup.opponentHand, FILLER].map((c) => data.canonical(c));
+    const codes = [...setup.main, ...setup.extra, ...setup.opponentHand, ...(setup.opponentExtra ?? []), FILLER].map((c) => data.canonical(c));
     return [...new Set(codes)].map((c) => `c${c}.lua`);
   }
 
@@ -268,6 +287,7 @@ export class DuelSession {
     for (const c of shuffle(deck, setup.seed)) add(0, c, OcgLocation.DECK);
     for (const c of setup.extra) add(0, c, OcgLocation.EXTRA);
     for (const c of setup.opponentHand) add(1, c, OcgLocation.HAND);
+    for (const c of setup.opponentExtra ?? []) add(1, c, OcgLocation.EXTRA);
     for (let i = 0; i < 40; i++) add(1, FILLER, OcgLocation.DECK);
 
     if (setup.hand) this.logLine(-1, 0, `起手：${setup.hand.map((c) => data.name(c)).join("、")}`);
@@ -370,7 +390,7 @@ export class DuelSession {
         }
       } else this.aiRetries = 0;
       if (m.type === OcgMessageType.SELECT_CHAIN) this.noteHit(m);
-      const r = recorded && !this.retry ? recorded : autoRespond(m, this.aiRetries);
+      const r = recorded && !this.retry ? recorded : this.opponentRespond(m, this.aiRetries);
       if (!recorded || this.retry) this.responses[this.ri] = r;
       this.retry = false;
       this.answer(m, r);
@@ -404,19 +424,61 @@ export class DuelSession {
     if (m.player === 1 && m.type === OcgMessageType.SELECT_CHAIN && r.type === OcgResponseType.SELECT_CHAIN && r.index !== null) {
       const code = m.selects[r.index]?.code;
       const hit = [...this.hits].reverse().find((x) => x.at === at);
-      if (hit && code) hit.used = code;
+      if (hit && code && hit.options.some((o) => o.code === code)) hit.used = code;
     }
     this.core.duelSetResponse(this.handle!, r);
+  }
+
+  /** 对手的选择：先按手坑的常见用法挑，引擎不接受时退回默认选择。 */
+  private opponentRespond(m: SelectMessage, attempt: number): OcgResponse {
+    return (attempt === 0 && this.opponentChoice(m)) || autoRespond(m, attempt);
+  }
+
+  private opponentChoice(m: SelectMessage): OcgResponse | null {
+    const want = this.setup.opponentSynchro;
+    switch (m.type) {
+      case OcgMessageType.SELECT_CHAIN: {
+        // 已经用过的手坑留下的后续效果（例如被送去墓地的 Golden Cloud Beast - Malong）直接发动
+        const i = m.selects.findIndex((c) => c.location !== OcgLocation.HAND);
+        return i >= 0 ? { type: OcgResponseType.SELECT_CHAIN, index: i } : null;
+      }
+      case OcgMessageType.SELECT_UNSELECT_CARD: {
+        // 展示额外卡组的卡（Fydraulis Harmonia）：能展示几张就展示几张，先选指定的同调怪兽
+        const all = [...m.select_cards, ...m.unselect_cards];
+        if (!all.length || !all.every((c) => c.controller === 1 && c.location === OcgLocation.EXTRA)) return null;
+        if (m.select_cards.length) return { type: OcgResponseType.SELECT_UNSELECT_CARD, index: Math.max(0, m.select_cards.findIndex((c) => c.code === want)) };
+        return m.can_finish ? { type: OcgResponseType.SELECT_UNSELECT_CARD, index: null } : null;
+      }
+      case OcgMessageType.SELECT_CARD: {
+        const n = Math.max(1, m.min);
+        const i = want ? m.selects.findIndex((c) => c.code === want && c.location === OcgLocation.EXTRA) : -1;
+        if (i >= 0 && n === 1) return { type: OcgResponseType.SELECT_CARD, indicies: [i] };
+        // 选你的卡（破坏、弹回、无效的对象）：优先刚发动效果的那张，其次额外卡组的怪兽，再按攻击力
+        if (m.selects.length && m.selects.every((c) => c.controller === 0)) {
+          const active = [...this.chain].reverse().find((c) => c.controller === 0)?.code;
+          const score = (code: number) => {
+            const card = this.data.cards.get(code);
+            return (code === active ? 1e6 : 0) + (card && isExtraDeckCard(card) ? 1e4 : 0) + (card?.data.attack ?? 0);
+          };
+          const order = m.selects.map((c, idx) => ({ idx, s: score(c.code) })).sort((a, b) => b.s - a.s);
+          return { type: OcgResponseType.SELECT_CARD, indicies: order.slice(0, n).map((o) => o.idx).sort((a, b) => a - b) };
+        }
+        return null;
+      }
+    }
+    return null;
   }
 
   private noteHit(m: Extract<OcgMessage, { type: OcgMessageType.SELECT_CHAIN }>) {
     if (m.selects.length === 0) return;
     // 对手连锁自己的卡不算吃坑点
     if (this.chain.at(-1)?.controller === 1) return;
+    // 只算手里的手坑；场上、墓地的后续效果由对手自动发动
     const options: HitOption[] = [];
     m.selects.forEach((s, index) => {
-      if (!options.some((o) => o.code === s.code)) options.push({ code: s.code, index });
+      if (s.location === OcgLocation.HAND && !options.some((o) => o.code === s.code)) options.push({ code: s.code, index });
     });
+    if (options.length === 0) return;
     const action = this.currentAction;
     const context = this.lastEvent;
     const key = options.map((o) => o.code).join(",");
@@ -451,14 +513,17 @@ export class DuelSession {
         }
         break;
       case OcgMessageType.DRAW:
+        this.trace.push({ action: act, kind: "draw", player: m.player, codes: m.drawn.map((c) => c.code) });
         if (m.player === 1 && this.gains.activated.length) this.gains.draws.push({ action: act, context: this.lastEvent, count: m.drawn.length });
         this.logLine(act, m.player as 0 | 1, `抽卡：${m.drawn.map((c) => (c.code ? nm(c.code) : "?")).join("、")}`);
         break;
       case OcgMessageType.SUMMONING:
+        this.trace.push({ action: act, kind: "summon", code: m.code, controller: m.controller, normal: true });
         this.lastEvent = `${nm(m.code)} 通常召唤`;
         this.logLine(act, m.controller, `通常召唤 ${nm(m.code)}`, m.code);
         break;
       case OcgMessageType.SPSUMMONING:
+        this.trace.push({ action: act, kind: "summon", code: m.code, controller: m.controller, normal: false });
         this.lastEvent = `${nm(m.code)} 特殊召唤`;
         this.logLine(act, m.controller, `特殊召唤 ${nm(m.code)}`, m.code);
         break;
@@ -473,6 +538,7 @@ export class DuelSession {
         break;
       case OcgMessageType.CHAINING: {
         this.chain.push({ code: m.code, controller: m.controller });
+        this.trace.push({ action: act, kind: "chain", code: m.code, controller: m.controller, location: m.location, sequence: m.sequence, link: m.chain_size });
         if (m.controller === 1 && DRAW_HANDTRAPS.has(m.code)) this.gains.activated.push({ code: m.code, action: act, context: this.lastEvent });
         const desc = d.describe(m.description);
         this.lastEvent = `${nm(m.code)} 发动效果`;
@@ -485,7 +551,11 @@ export class DuelSession {
         if (code) this.logLine(act, 0, `连锁 ${m.chain_size} 的 ${nm(code)} 被无效`, code);
         break;
       }
+      case OcgMessageType.CHAIN_SOLVING:
+        this.trace.push({ action: act, kind: "solving", link: m.chain_size });
+        break;
       case OcgMessageType.CHAIN_SOLVED:
+        this.trace.push({ action: act, kind: "solved", link: m.chain_size });
         this.lastEvent = "效果处理完";
         break;
       case OcgMessageType.CHAIN_END:
@@ -494,6 +564,7 @@ export class DuelSession {
         break;
       case OcgMessageType.MOVE: {
         const { from, to } = m;
+        this.trace.push({ action: act, kind: "move", code: m.card, from, to });
         if (from.controller === 1 && from.location === OcgLocation.HAND && to.location === OcgLocation.DECK && this.gains.activated.length) this.gains.returned++;
         if (!m.card || from.location === to.location) break;
         if (from.location === OcgLocation.DECK && to.location === OcgLocation.HAND) this.lastEvent = `${nm(m.card)} 从卡组加入手卡`;
