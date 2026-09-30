@@ -29,6 +29,8 @@ export interface Interruption {
   actionIndex: number;
   timing: Timing;
   reason: string;
+  /** 作者排的重要性（0 最重要）；没排过的没有这个字段。 */
+  rank?: number;
   /** 以下字段只有作者写了说明时才有。 */
   impact?: InterruptionImpact;
   note?: string;
@@ -123,34 +125,43 @@ export function deriveInterruptions(combo: Combo): Interruption[] {
   return out;
 }
 
-/** 作者说明覆盖同一手坑的自动结果；applies=false 的会被移除；只在说明里出现的手坑也会加进来。 */
+const SEVERITY: Record<InterruptionImpact | "unknown", number> = {
+  combo_ends: 0,
+  reroute: 1,
+  reduced_endboard: 2,
+  unknown: 3,
+  minor: 4,
+};
+
+/**
+ * 合并作者说明和自动结果：
+ * - 作者说明覆盖同一手坑的自动结果，applies=false 的会被移除；只在说明里出现的手坑也会加进来。
+ * - 排序：作者排过的按说明顺序在前，其余按影响严重度排在后面。
+ */
 function mergeNotes(step: Step, auto: Interruption[]): Interruption[] {
-  const notes = new Map(step.interruptions.map((n) => [n.handtrap, n]));
-  const result: Interruption[] = [];
-  for (const i of auto) {
-    const n = notes.get(i.handtrap);
-    if (!n) {
-      result.push(i);
-      continue;
-    }
-    if (n.applies) {
-      result.push({ ...i, impact: n.impact, note: n.note, fallbackStepId: n.fallbackStepId, fallbackComboId: n.fallbackComboId });
-    }
-  }
-  for (const n of step.interruptions) {
-    if (n.applies && !auto.some((i) => i.handtrap === n.handtrap)) {
-      result.push({
-        handtrap: n.handtrap,
-        stepId: step.id,
-        actionIndex: 0,
-        timing: "chain_to_activation",
-        reason: "作者手动标注",
-        impact: n.impact,
-        note: n.note,
-        fallbackStepId: n.fallbackStepId,
-        fallbackComboId: n.fallbackComboId,
-      });
-    }
-  }
-  return result;
+  const ranked: Interruption[] = [];
+  step.interruptions.forEach((n, rank) => {
+    if (!n.applies) return;
+    const base: Interruption = auto.find((i) => i.handtrap === n.handtrap) ?? {
+      handtrap: n.handtrap,
+      stepId: step.id,
+      actionIndex: 0,
+      timing: "chain_to_activation",
+      reason: "作者手动标注",
+    };
+    ranked.push({
+      ...base,
+      rank,
+      impact: n.impact,
+      note: n.note || undefined,
+      fallbackStepId: n.fallbackStepId,
+      fallbackComboId: n.fallbackComboId,
+    });
+  });
+  const noted = new Set(step.interruptions.map((n) => n.handtrap));
+  const seen = new Set<number>();
+  const rest = auto
+    .filter((i) => !noted.has(i.handtrap) && !seen.has(i.handtrap) && seen.add(i.handtrap))
+    .sort((a, b) => SEVERITY[a.impact ?? "unknown"] - SEVERITY[b.impact ?? "unknown"]);
+  return [...ranked, ...rest];
 }

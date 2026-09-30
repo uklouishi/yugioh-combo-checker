@@ -9,7 +9,8 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "validate": "tsx scripts/validate-combos.ts",
-    "sync-cards": "tsx scripts/sync-cards.ts"
+    "sync-cards": "tsx scripts/sync-cards.ts",
+    "sync-all-images": "tsx scripts/sync-all-images.ts"
   },
   "dependencies": {
     "react": "^19.3.0",

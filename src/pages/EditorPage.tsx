@@ -5,6 +5,7 @@ import { comboStore, useCombos } from "../data/store";
 import { parseCombos } from "../data/userCombos";
 import { CardSearch, type PoolRole } from "../editor/CardSearch";
 import { newDraft, newStep, sanitize, type Draft } from "../editor/draft";
+import { HandtrapWindow } from "../editor/HandtrapWindow";
 import { StepEditor } from "../editor/StepEditor";
 import { simulatePartial } from "../model/board";
 import { deriveInterruptions } from "../model/interruptions";
@@ -70,6 +71,12 @@ function Editor({ id, initial, hasDraft }: { id?: string; initial: Draft; hasDra
   const clean = useMemo(() => sanitize(draft), [draft]);
   const sim = useMemo(() => simulatePartial(clean), [clean]);
   const hits = useMemo(() => deriveInterruptions(clean), [clean]);
+  // 不带作者说明时自动识别出的吃坑点，悬浮窗「恢复默认」用。
+  const autoHits = useMemo(
+    () => deriveInterruptions({ ...clean, steps: clean.steps.map((s) => ({ ...s, interruptions: [] })) }),
+    [clean],
+  );
+  const [htStep, setHtStep] = useState<number | null>(null);
   const validation = useMemo(() => parseCombos(JSON.stringify(draft), all.filter((c) => c.id !== draft.id)), [draft, all]);
   const cards = useCards([...pool.map((c) => c.id), ...handtraps.map((h) => h.id)]);
 
@@ -236,7 +243,11 @@ function Editor({ id, initial, hasDraft }: { id?: string; initial: Draft; hasDra
                 index={i}
                 total={draft.steps.length}
                 pool={pool}
-                steps={draft.steps}
+                hits={hits.filter((h) => h.stepId === s.id)}
+                onOpenHandtraps={() => {
+                  setSelected(i);
+                  setHtStep(i);
+                }}
                 selected={selected === i}
                 onSelect={() => setSelected(i)}
                 onChange={(step) => setSteps(draft.steps.map((x, j) => (j === i ? step : x)))}
@@ -314,7 +325,12 @@ function Editor({ id, initial, hasDraft }: { id?: string; initial: Draft; hasDra
           {sim.error && <p className="errors-inline">{sim.error}</p>}
           {selectedStep && (
             <div className="preview-hits">
-              <div className="pool-label">这一步能打的手坑</div>
+              <div className="sub-head">
+                <div className="pool-label">这一步能打的手坑（按重要性）</div>
+                <button className="btn" onClick={() => setHtStep(selected)}>
+                  排序和备注
+                </button>
+              </div>
               {stepHits.length === 0 && <div className="muted">没有常见手坑能打。</div>}
               {stepHits.map((h) => (
                 <div key={h.handtrap} className={`hit ${h.impact ? `s-${h.impact}` : "s-auto"}`}>
@@ -361,6 +377,19 @@ function Editor({ id, initial, hasDraft }: { id?: string; initial: Draft; hasDra
         </div>
       </div>
 
+      {htStep !== null && draft.steps[htStep] && (
+        <HandtrapWindow
+          key={draft.steps[htStep].id}
+          step={draft.steps[htStep]}
+          stepIndex={htStep}
+          steps={draft.steps}
+          hits={hits.filter((h) => h.stepId === draft.steps[htStep].id)}
+          autoHits={autoHits.filter((h) => h.stepId === draft.steps[htStep].id)}
+          cards={cards}
+          onApply={(interruptions) => setSteps(draft.steps.map((x, j) => (j === htStep ? { ...x, interruptions } : x)))}
+          onClose={() => setHtStep(null)}
+        />
+      )}
       {openCard !== null && (
         <CardDetail
           id={openCard}
