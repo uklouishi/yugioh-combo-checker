@@ -32,6 +32,19 @@ export interface DuelSetup {
   seed: number;
 }
 
+/** 对方每次召唤就抽卡的手坑（Maxx "C"、Mulcharmy）。 */
+export const DRAW_HANDTRAPS = new Set([23434538, 42141493, 84192580, 87126721]);
+
+/** 对手发动 Maxx "C" 类手坑后拿到的收益。 */
+export interface Gains {
+  /** 发动了哪些，在第几个操作。 */
+  activated: { code: number; action: number; context: string }[];
+  /** 每次抽卡：在哪个操作、因为什么。 */
+  draws: { action: number; context: string; count: number }[];
+  /** 结束阶段从手卡洗回卡组的张数（Mulcharmy 的限制）。 */
+  returned: number;
+}
+
 /** 需要玩家做选择的消息。 */
 export type SelectMessage = Extract<
   OcgMessage,
@@ -171,6 +184,7 @@ export class DuelSession {
   status: Status = "prompt";
   prompt: Prompt | null = null;
   lp: [number, number] = [8000, 8000];
+  readonly gains: Gains = { activated: [], draws: [], returned: 0 };
 
   private handle: OcgDuelHandle | null = null;
   private ri = 0;
@@ -431,9 +445,13 @@ export class DuelSession {
         }
         break;
       case OcgMessageType.NEW_PHASE:
-        if (PHASE_NAME[m.phase]) this.logLine(act, 0, `进入${PHASE_NAME[m.phase]}`);
+        if (PHASE_NAME[m.phase]) {
+          this.lastEvent = `进入${PHASE_NAME[m.phase]}`;
+          this.logLine(act, 0, this.lastEvent);
+        }
         break;
       case OcgMessageType.DRAW:
+        if (m.player === 1 && this.gains.activated.length) this.gains.draws.push({ action: act, context: this.lastEvent, count: m.drawn.length });
         this.logLine(act, m.player as 0 | 1, `抽卡：${m.drawn.map((c) => (c.code ? nm(c.code) : "?")).join("、")}`);
         break;
       case OcgMessageType.SUMMONING:
@@ -455,6 +473,7 @@ export class DuelSession {
         break;
       case OcgMessageType.CHAINING: {
         this.chain.push({ code: m.code, controller: m.controller });
+        if (m.controller === 1 && DRAW_HANDTRAPS.has(m.code)) this.gains.activated.push({ code: m.code, action: act, context: this.lastEvent });
         const desc = d.describe(m.description);
         this.lastEvent = `${nm(m.code)} 发动效果`;
         this.logLine(act, m.controller, `连锁 ${m.chain_size}：${nm(m.code)}${desc ? `（${desc}）` : ""}`, m.code);
@@ -475,6 +494,7 @@ export class DuelSession {
         break;
       case OcgMessageType.MOVE: {
         const { from, to } = m;
+        if (from.controller === 1 && from.location === OcgLocation.HAND && to.location === OcgLocation.DECK && this.gains.activated.length) this.gains.returned++;
         if (!m.card || from.location === to.location) break;
         if (from.location === OcgLocation.DECK && to.location === OcgLocation.HAND) this.lastEvent = `${nm(m.card)} 从卡组加入手卡`;
         if (to.location === OcgLocation.MZONE && from.location !== OcgLocation.MZONE) break; // 召唤已经记过

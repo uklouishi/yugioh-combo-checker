@@ -151,6 +151,26 @@
     "def": 600
   },
   {
+    "id": 42141493,
+    "name": "Mulcharmy Fuwalos",
+    "type": "Effect Monster",
+    "frameType": "effect",
+    "desc": "If you control no cards (Quick Effect): You can discard this card; apply these effects this turn.\r\n● Each time your opponent Special Summons a monster(s) from the Deck and/or Extra Deck, immediately draw 1 card.\r\n● Once, during this End Phase, if the number of cards in your hand is more than the number of cards your opponent controls +6, you must randomly shuffle cards from your hand into the Deck so the number in your hand equals the number your opponent controls +6.\r\nYou can only activate 1 other \"Mulcharmy\" monster effect, the turn you activate this effect.",
+    "race": "Winged Beast",
+    "card_images": [
+      {
+        "id": 42141493,
+        "image_url": "",
+        "image_url_small": "",
+        "image_url_cropped": ""
+      }
+    ],
+    "atk": 100,
+    "attribute": "WIND",
+    "level": 4,
+    "def": 600
+  },
+  {
     "id": 45663742,
     "name": "Snake-Eye Oak",
     "type": "Effect Monster",
@@ -229,6 +249,46 @@
     "attribute": "EARTH",
     "level": 3,
     "def": 1800
+  },
+  {
+    "id": 84192580,
+    "name": "Mulcharmy Purulia",
+    "type": "Effect Monster",
+    "frameType": "effect",
+    "desc": "If you control no cards (Quick Effect): You can discard this card; apply these effects this turn.\r\n● Each time your opponent Normal or Special Summons a monster(s) from the hand, immediately draw 1 card.\r\n● Once, during this End Phase, if the number of cards in your hand is more than the number of cards your opponent controls +6, you must randomly shuffle cards from your hand into the Deck so the number in your hand equals the number your opponent controls +6.\r\nYou can only activate 1 other \"Mulcharmy\" monster effect, the turn you activate this effect.",
+    "race": "Aqua",
+    "card_images": [
+      {
+        "id": 84192580,
+        "image_url": "",
+        "image_url_small": "",
+        "image_url_cropped": ""
+      }
+    ],
+    "atk": 100,
+    "attribute": "WATER",
+    "level": 4,
+    "def": 600
+  },
+  {
+    "id": 87126721,
+    "name": "Mulcharmy Meowls",
+    "type": "Effect Monster",
+    "frameType": "effect",
+    "desc": "If you control no cards (Quick Effect): You can discard this card; apply these effects this turn.\r\n● Each time your opponent Special Summons a monster(s) from any GY(s) or banishment, immediately draw 1 card.\r\n● Once, during this End Phase, if the number of cards in your hand is more than the number of cards your opponent controls +6, you must randomly shuffle cards from your hand into the Deck so the number in your hand equals the number your opponent controls +6.\r\nYou can only activate 1 other \"Mulcharmy\" monster effect, the turn you activate this effect.",
+    "race": "Beast",
+    "card_images": [
+      {
+        "id": 87126721,
+        "image_url": "",
+        "image_url_small": "",
+        "image_url_cropped": ""
+      }
+    ],
+    "atk": 100,
+    "attribute": "EARTH",
+    "level": 4,
+    "def": 600
   },
   {
     "id": 89023486,

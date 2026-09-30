@@ -62,6 +62,15 @@ function toCard(r: CardRow): EngineCard {
 
 export type Fetcher = (path: string) => Promise<string | null>;
 
+export type Format = "tcg" | "ocg";
+export const FORMATS: Format[] = ["tcg", "ocg"];
+
+/** 禁卡表：卡号 → 0 禁止 / 1 限制 / 2 准限制，没列出的可以放 3 张。 */
+export interface Banlist {
+  name: string;
+  cards: Record<number, number>;
+}
+
 export class EngineData {
   readonly cards = new Map<number, EngineCard>();
   readonly scripts = new Map<string, string | null>();
@@ -70,14 +79,24 @@ export class EngineData {
     readonly base: Record<string, string>,
     readonly sys: Record<string, string>,
     private readonly fetcher: Fetcher,
+    readonly banlists: Partial<Record<Format, Banlist>> = {},
   ) {
     for (const r of rows) this.cards.set(r[0], toCard(r));
   }
 
   static async load(fetcher: Fetcher): Promise<EngineData> {
-    const [cards, base, sys] = await Promise.all([fetcher("cards.json"), fetcher("base.json"), fetcher("strings.json")]);
+    const [cards, base, sys, banlists] = await Promise.all(
+      ["cards.json", "base.json", "strings.json", "banlists.json"].map((f) => fetcher(f).catch(() => null)),
+    );
     if (!cards || !base || !sys) throw new Error("引擎数据加载失败");
-    return new EngineData(JSON.parse(cards).cards, JSON.parse(base), JSON.parse(sys), fetcher);
+    return new EngineData(JSON.parse(cards).cards, JSON.parse(base), JSON.parse(sys), fetcher, banlists ? JSON.parse(banlists) : {});
+  }
+
+  /** 这个禁卡表下最多能放几张（异画按本体算）。 */
+  limit(format: Format, code: number): number {
+    const cards = this.banlists[format]?.cards;
+    if (!cards) return 3;
+    return cards[code] ?? cards[this.canonical(code)] ?? 3;
   }
 
   /** 卡组里用的是异画（alias 指向本体且卡号相近）时换成本体卡号，脚本只有本体有。 */
