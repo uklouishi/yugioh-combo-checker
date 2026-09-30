@@ -1,0 +1,12 @@
+[
+  { "id": 14558127, "name": "Ash Blossom & Joyous Spring", "nameZh": "灰流丽", "summary": "对方发动包含「从卡组检索 / 从卡组特召 / 从卡组送墓」的效果时连锁，无效该效果。" },
+  { "id": 23434538, "name": "Maxx \"C\"", "nameZh": "增殖的G", "summary": "任意时点发动，本回合对方每次特召你抽 1 张。通常在对方第一次特召前后丢。" },
+  { "id": 10045474, "name": "Infinite Impermanence", "nameZh": "无限泡影", "summary": "以对方场上 1 只表侧怪兽为对象，无效其效果；自己场上没有卡时可以从手卡发动。" },
+  { "id": 97268402, "name": "Effect Veiler", "nameZh": "效果遮蒙者", "summary": "对方主要阶段，以对方场上 1 只效果怪兽为对象，无效其效果。" },
+  { "id": 59438930, "name": "Ghost Ogre & Snow Rabbit", "nameZh": "幽鬼兔", "summary": "场上的怪兽发动效果、或场上已经表侧的魔陷发动效果时，破坏那张卡（不无效效果）。" },
+  { "id": 94145021, "name": "Droll & Lock Bird", "nameZh": "小丑与锁鸟", "summary": "对方在抽卡阶段以外从卡组把卡加入手卡后发动，本回合双方都不能再从卡组加卡入手。" },
+  { "id": 27204311, "name": "Nibiru, the Primal Being", "nameZh": "原始生命态 尼比鲁", "summary": "主要阶段，对方本回合通常/特殊召唤了 5 次以上时，解放场上全部表侧怪兽。" },
+  { "id": 73642296, "name": "Ghost Belle & Haunted Mansion", "nameZh": "屋敷童", "summary": "对方发动包含「从墓地回收 / 从墓地特召 / 除外墓地的卡」的效果时连锁，无效那次发动。" },
+  { "id": 24508238, "name": "D.D. Crow", "nameZh": "D.D.乌鸦", "summary": "以对方墓地 1 张卡为对象除外，常用于让以墓地卡为对象或在墓地发动的效果失去对象。" },
+  { "id": 24224830, "name": "Called by the Grave", "nameZh": "墓穴的指名者", "summary": "除外对方墓地 1 只怪兽，并无效同名怪兽的效果直到下个回合结束（速攻魔法，需要事先盖放或在自己回合使用）。" }
+]

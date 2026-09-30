@@ -1,0 +1,309 @@
+[
+  {
+    "id": 2772337,
+    "name": "Promethean Princess, Bestower of Flames",
+    "type": "Link Monster",
+    "frameType": "link",
+    "desc": "2+ Effect Monsters\r\nYou cannot Special Summon monsters, except FIRE monsters. You can only use each of the following effects of \"Promethean Princess, Bestower of Flames\" once per turn. During your Main Phase: You can Special Summon 1 FIRE monster from your GY. If a monster(s) is Special Summoned to your opponent's field, while this card is in your GY (except during the Damage Step): You can target 1 FIRE monster you control and 1 monster your opponent controls; destroy them, and if you do, Special Summon this card.",
+    "race": "Fiend",
+    "card_images": [
+      {
+        "id": 2772337,
+        "image_url": "",
+        "image_url_small": "",
+        "image_url_cropped": ""
+      }
+    ],
+    "atk": 2700,
+    "attribute": "FIRE",
+    "linkval": 3
+  },
+  {
+    "id": 9674034,
+    "name": "Snake-Eye Ash",
+    "type": "Effect Monster",
+    "frameType": "effect",
+    "desc": "If this card is Normal or Special Summoned: You can add 1 Level 1 FIRE monster from your Deck to your hand. You can send 2 face-up cards you control to the GY, including this card; Special Summon 1 \"Snake-Eye\" monster from your hand or Deck, except \"Snake-Eye Ash\". You can only use each effect of \"Snake-Eye Ash\" once per turn.",
+    "race": "Pyro",
+    "card_images": [
+      {
+        "id": 9674034,
+        "image_url": "",
+        "image_url_small": "",
+        "image_url_cropped": ""
+      }
+    ],
+    "atk": 800,
+    "attribute": "FIRE",
+    "level": 1,
+    "def": 1000
+  },
+  {
+    "id": 10045474,
+    "name": "Infinite Impermanence",
+    "type": "Normal Trap Card",
+    "frameType": "trap",
+    "desc": "Target 1 face-up monster your opponent controls; negate its effects (until the end of this turn), then, if this card was Set before activation and is on the field at resolution, for the rest of this turn all other Spell/Trap effects in this column are negated. If you control no cards, you can activate this card from your hand.",
+    "race": "Normal",
+    "card_images": [
+      {
+        "id": 10045474,
+        "image_url": "",
+        "image_url_small": "",
+        "image_url_cropped": ""
+      }
+    ]
+  },
+  {
+    "id": 14558127,
+    "name": "Ash Blossom & Joyous Spring",
+    "type": "Effect Monster",
+    "frameType": "effect",
+    "desc": "When a card or effect is activated that includes any of these effects (Quick Effect): You can discard this card; negate that effect.\r\n● Add a card(s) from the Deck to the hand.\r\n● Special Summon a Monster Card(s) from the Deck.\r\n● Send a card(s) from the Deck to the GY.\r\nYou can only use this effect of \"Ash Blossom & Joyous Spring\" once per turn.\r\n\r\n* The above text is unofficial and describes the card's functionality in the OCG.",
+    "race": "Zombie",
+    "card_images": [
+      {
+        "id": 14558127,
+        "image_url": "",
+        "image_url_small": "",
+        "image_url_cropped": ""
+      }
+    ],
+    "atk": 0,
+    "attribute": "FIRE",
+    "level": 3,
+    "def": 1800
+  },
+  {
+    "id": 23434538,
+    "name": "Maxx \"C\"",
+    "type": "Effect Monster",
+    "frameType": "effect",
+    "desc": "(Quick Effect): You can send this card from your hand to the GY; this turn, each time your opponent Special Summons a monster(s), immediately draw 1 card. You can only use this effect of \"Maxx \"C\"\" once per turn.",
+    "race": "Insect",
+    "card_images": [
+      {
+        "id": 23434538,
+        "image_url": "",
+        "image_url_small": "",
+        "image_url_cropped": ""
+      }
+    ],
+    "atk": 500,
+    "attribute": "EARTH",
+    "level": 2,
+    "def": 200
+  },
+  {
+    "id": 24224830,
+    "name": "Called by the Grave",
+    "type": "Quick-Play Spell Card",
+    "frameType": "spell",
+    "desc": "Target 1 monster in your opponent's GY; banish it, and if you do, until the end of the next turn, its effects are negated, as well as the activated effects and effects on the field of monsters with the same original name.",
+    "race": "Quick-Play",
+    "card_images": [
+      {
+        "id": 24224830,
+        "image_url": "",
+        "image_url_small": "",
+        "image_url_cropped": ""
+      }
+    ]
+  },
+  {
+    "id": 24508238,
+    "name": "D.D. Crow",
+    "type": "Effect Monster",
+    "frameType": "effect",
+    "desc": "(Quick Effect): You can discard this card to the GY, then target 1 card in your opponent's GY; banish that target.",
+    "race": "Winged Beast",
+    "card_images": [
+      {
+        "id": 24508238,
+        "image_url": "",
+        "image_url_small": "",
+        "image_url_cropped": ""
+      }
+    ],
+    "atk": 100,
+    "attribute": "DARK",
+    "level": 1,
+    "def": 100
+  },
+  {
+    "id": 27204311,
+    "name": "Nibiru, the Primal Being",
+    "type": "Effect Monster",
+    "frameType": "effect",
+    "desc": "During the Main Phase, if your opponent Normal or Special Summoned 5 or more monsters this turn (Quick Effect): You can Tribute as many face-up monsters on the field as possible, and if you do, Special Summon this card from your hand, then Special Summon 1 \"Primal Being Token\" (Rock/LIGHT/Level 11/ATK ?/DEF ?) to your opponent's field. (This Token's ATK/DEF become the combined original ATK/DEF of the Tributed monsters.) You can only use this effect of \"Nibiru, the Primal Being\" once per turn.",
+    "race": "Rock",
+    "card_images": [
+      {
+        "id": 27204311,
+        "image_url": "",
+        "image_url_small": "",
+        "image_url_cropped": ""
+      }
+    ],
+    "atk": 3000,
+    "attribute": "LIGHT",
+    "level": 11,
+    "def": 600
+  },
+  {
+    "id": 45663742,
+    "name": "Snake-Eye Oak",
+    "type": "Effect Monster",
+    "frameType": "effect",
+    "desc": "If this card is Normal or Special Summoned: You can target 1 of your Level 1 FIRE monsters that is banished or in your GY; either add it to your hand or Special Summon it. You can send 2 face-up cards you control to the GY, including this card; Special Summon 1 \"Snake-Eye\" monster from your hand or Deck, except \"Snake-Eye Oak\". You can only use each effect of \"Snake-Eye Oak\" once per turn.",
+    "race": "Pyro",
+    "card_images": [
+      {
+        "id": 45663742,
+        "image_url": "",
+        "image_url_small": "",
+        "image_url_cropped": ""
+      }
+    ],
+    "atk": 900,
+    "attribute": "FIRE",
+    "level": 1,
+    "def": 200
+  },
+  {
+    "id": 48452496,
+    "name": "Snake-Eyes Flamberge Dragon",
+    "type": "Effect Monster",
+    "frameType": "effect",
+    "desc": "You can target 1 face-up monster on the field or in either GY; place it face-up in its owner's Spell & Trap Zone as a Continuous Spell. During your opponent's turn (Quick Effect): You can target 1 Monster Card treated as a Continuous Spell on the field; Special Summon it to your field. If this card is sent from the hand or field to the GY: You can Special Summon 2 Level 1 FIRE monsters from your GY. You can only use each effect of \"Snake-Eyes Flamberge Dragon\" once per turn.",
+    "race": "Dragon",
+    "card_images": [
+      {
+        "id": 48452496,
+        "image_url": "",
+        "image_url_small": "",
+        "image_url_cropped": ""
+      }
+    ],
+    "atk": 3000,
+    "attribute": "FIRE",
+    "level": 8,
+    "def": 2500
+  },
+  {
+    "id": 59438930,
+    "name": "Ghost Ogre & Snow Rabbit",
+    "type": "Effect Monster",
+    "frameType": "effect",
+    "desc": "When a monster on the field activates its effect, or when a Spell/Trap that is already face-up on the field activates its effect (Quick Effect): You can send this card from your hand or field to the GY; destroy that card on the field. You can only use this effect of \"Ghost Ogre & Snow Rabbit\" once per turn.",
+    "race": "Psychic",
+    "card_images": [
+      {
+        "id": 59438930,
+        "image_url": "",
+        "image_url_small": "",
+        "image_url_cropped": ""
+      }
+    ],
+    "atk": 0,
+    "attribute": "LIGHT",
+    "level": 3,
+    "def": 1800
+  },
+  {
+    "id": 73642296,
+    "name": "Ghost Belle & Haunted Mansion",
+    "type": "Effect Monster",
+    "frameType": "effect",
+    "desc": "When a card or effect is activated that includes any of these effects (Quick Effect): You can discard this card; negate that activation.\r\n● Add a card(s) from the GY to the hand, Deck, and/or Extra Deck.\r\n● Special Summon a Monster Card(s) from the GY.\r\n● Banish a card(s) from the GY.\r\nYou can only use this effect of \"Ghost Belle & Haunted Mansion\" once per turn.",
+    "race": "Zombie",
+    "card_images": [
+      {
+        "id": 73642296,
+        "image_url": "",
+        "image_url_small": "",
+        "image_url_cropped": ""
+      }
+    ],
+    "atk": 0,
+    "attribute": "EARTH",
+    "level": 3,
+    "def": 1800
+  },
+  {
+    "id": 89023486,
+    "name": "Original Sinful Spoils - Snake-Eye",
+    "type": "Normal Spell Card",
+    "frameType": "spell",
+    "desc": "Send 1 other face-up card you control to the GY; Special Summon 1 Level 1 FIRE monster from your hand or Deck. You can banish this card from your GY, then target 1 \"Snake-Eye\" or \"Diabellstar\" monster in your GY; add 1 Level 1 FIRE monster from your Deck to your hand, then place the targeted monster on the bottom of the Deck. You can only use 1 \"Original Sinful Spoils - Snake-Eye\" effect per turn, and only once that turn.",
+    "race": "Normal",
+    "card_images": [
+      {
+        "id": 89023486,
+        "image_url": "",
+        "image_url_small": "",
+        "image_url_cropped": ""
+      }
+    ]
+  },
+  {
+    "id": 90241276,
+    "name": "Snake-Eyes Poplar",
+    "type": "Effect Monster",
+    "frameType": "effect",
+    "desc": "If this card is added to your hand, except by drawing it: You can Special Summon this card. If this card is Normal or Special Summoned: You can add 1 \"Snake-Eye\" Spell/Trap from your Deck to your hand. If this card is sent to the GY: You can target 1 FIRE monster in your GY; place it face-up in its owner's Spell & Trap Zone as a Continuous Spell. You can only use each effect of \"Snake-Eyes Poplar\" once per turn.",
+    "race": "Pyro",
+    "card_images": [
+      {
+        "id": 90241276,
+        "image_url": "",
+        "image_url_small": "",
+        "image_url_cropped": ""
+      }
+    ],
+    "atk": 700,
+    "attribute": "FIRE",
+    "level": 1,
+    "def": 200
+  },
+  {
+    "id": 94145021,
+    "name": "Droll & Lock Bird",
+    "type": "Effect Monster",
+    "frameType": "effect",
+    "desc": "If a card(s) is added from the Main Deck to your opponent's hand, except during the Draw Phase (Quick Effect): You can send this card from your hand to the GY; for the rest of this turn, cards cannot be added from either player's Main Deck to the hand.",
+    "race": "Spellcaster",
+    "card_images": [
+      {
+        "id": 94145021,
+        "image_url": "",
+        "image_url_small": "",
+        "image_url_cropped": ""
+      }
+    ],
+    "atk": 0,
+    "attribute": "WIND",
+    "level": 1,
+    "def": 0
+  },
+  {
+    "id": 97268402,
+    "name": "Effect Veiler",
+    "type": "Effect Monster",
+    "frameType": "effect",
+    "desc": "During your opponent's Main Phase (Quick Effect): You can send this card from your hand to the GY, then target 1 Effect Monster your opponent controls; negate the effects of that face-up monster your opponent controls, until the end of this turn.",
+    "race": "Spellcaster",
+    "card_images": [
+      {
+        "id": 97268402,
+        "image_url": "",
+        "image_url_small": "",
+        "image_url_cropped": ""
+      }
+    ],
+    "atk": 0,
+    "attribute": "LIGHT",
+    "level": 1,
+    "def": 0
+  }
+]

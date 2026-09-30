@@ -1,0 +1,635 @@
+{
+  "id": "snake-eye-ash-1card",
+  "deck": "Snake-Eye",
+  "title": "蛇眼 Ash 单卡起手：公主 + 焰剑龙",
+  "format": "TCG",
+  "updatedAt": "2026-09-30",
+  "sources": [
+    "路线按卡片文本推导（ProjectIgnis BabelCDB 英文文本），是示例数据，请实战核对。"
+  ],
+  "starter": [
+    {
+      "id": 9674034,
+      "name": "Snake-Eye Ash"
+    }
+  ],
+  "requires": {
+    "deck": [
+      {
+        "id": 90241276,
+        "name": "Snake-Eyes Poplar"
+      },
+      {
+        "id": 89023486,
+        "name": "Original Sinful Spoils - Snake-Eye"
+      },
+      {
+        "id": 45663742,
+        "name": "Snake-Eye Oak"
+      },
+      {
+        "id": 48452496,
+        "name": "Snake-Eyes Flamberge Dragon"
+      }
+    ],
+    "extra": [
+      {
+        "id": 2772337,
+        "name": "Promethean Princess, Bestower of Flames"
+      }
+    ]
+  },
+  "steps": [
+    {
+      "id": "s1",
+      "title": "通常召唤 Snake-Eye Ash",
+      "actions": [
+        {
+          "type": "summon",
+          "summon": {
+            "card": {
+              "id": 9674034,
+              "name": "Snake-Eye Ash"
+            },
+            "method": "normal",
+            "from": "hand"
+          }
+        }
+      ],
+      "moves": [
+        {
+          "card": {
+            "id": 9674034,
+            "name": "Snake-Eye Ash"
+          },
+          "from": "hand",
+          "to": "monster",
+          "slot": 2
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "Ash ①：检索 Snake-Eyes Poplar",
+      "actions": [
+        {
+          "type": "activate",
+          "activation": {
+            "card": {
+              "id": 9674034,
+              "name": "Snake-Eye Ash"
+            },
+            "from": "monster",
+            "kind": "monster_effect",
+            "effectIndex": 1,
+            "effects": [
+              "add_from_deck"
+            ],
+            "result": [
+              {
+                "id": 90241276,
+                "name": "Snake-Eyes Poplar"
+              }
+            ]
+          }
+        }
+      ],
+      "moves": [
+        {
+          "card": {
+            "id": 90241276,
+            "name": "Snake-Eyes Poplar"
+          },
+          "from": "deck",
+          "to": "hand"
+        }
+      ],
+      "interruptions": [
+        {
+          "handtrap": 14558127,
+          "impact": "combo_ends",
+          "note": "检索被无效后手里没有后续，Ash ② 也凑不出 2 张表侧卡。"
+        },
+        {
+          "handtrap": 10045474,
+          "impact": "combo_ends",
+          "note": "同灰流丽：Ash 被无效后拿不到 Poplar。"
+        },
+        {
+          "handtrap": 97268402,
+          "impact": "combo_ends",
+          "note": "同灰流丽：Ash 被无效后拿不到 Poplar。"
+        },
+        {
+          "handtrap": 59438930,
+          "impact": "reduced_endboard",
+          "note": "幽鬼兔只破坏 Ash，检索照常处理；少一个素材，出不了三素材的公主。"
+        },
+        {
+          "handtrap": 94145021,
+          "impact": "reduced_endboard",
+          "note": "Poplar 仍会到手并自特，但 Poplar ② 检索不了魔法。改走 Ash ②（送 Ash + Poplar，从卡组特召 Oak）。"
+        }
+      ]
+    },
+    {
+      "id": "s3",
+      "title": "Poplar ①：非抽卡加入手卡，自身特殊召唤",
+      "actions": [
+        {
+          "type": "activate",
+          "activation": {
+            "card": {
+              "id": 90241276,
+              "name": "Snake-Eyes Poplar"
+            },
+            "from": "hand",
+            "kind": "monster_effect",
+            "effectIndex": 1,
+            "effects": [
+              "ss_from_hand"
+            ]
+          }
+        },
+        {
+          "type": "resolve_summon",
+          "summon": {
+            "card": {
+              "id": 90241276,
+              "name": "Snake-Eyes Poplar"
+            },
+            "method": "special",
+            "from": "hand"
+          }
+        }
+      ],
+      "moves": [
+        {
+          "card": {
+            "id": 90241276,
+            "name": "Snake-Eyes Poplar"
+          },
+          "from": "hand",
+          "to": "monster",
+          "slot": 3
+        }
+      ],
+      "interruptions": [
+        {
+          "handtrap": 23434538,
+          "impact": "reduced_endboard",
+          "note": "后面还有 5 次特召，全打完对手多抽 5 张。可以考虑只做到公主就停。"
+        }
+      ]
+    },
+    {
+      "id": "s4",
+      "title": "Poplar ②：检索 Original Sinful Spoils - Snake-Eye",
+      "actions": [
+        {
+          "type": "activate",
+          "activation": {
+            "card": {
+              "id": 90241276,
+              "name": "Snake-Eyes Poplar"
+            },
+            "from": "monster",
+            "kind": "monster_effect",
+            "effectIndex": 2,
+            "effects": [
+              "add_from_deck"
+            ],
+            "result": [
+              {
+                "id": 89023486,
+                "name": "Original Sinful Spoils - Snake-Eye"
+              }
+            ]
+          }
+        }
+      ],
+      "moves": [
+        {
+          "card": {
+            "id": 89023486,
+            "name": "Original Sinful Spoils - Snake-Eye"
+          },
+          "from": "deck",
+          "to": "hand"
+        }
+      ],
+      "interruptions": [
+        {
+          "handtrap": 14558127,
+          "impact": "reroute",
+          "note": "拿不到罪宝魔法。改用 Ash ②：送 Ash + Poplar，从卡组特召 Oak，Oak 再苏生 Poplar。"
+        },
+        {
+          "handtrap": 59438930,
+          "impact": "minor",
+          "note": "Poplar 被破坏送墓，检索照常处理，Poplar ③ 还能用。"
+        }
+      ]
+    },
+    {
+      "id": "s5",
+      "title": "发动 Original Sinful Spoils：送 Poplar，从卡组特召 Snake-Eye Oak",
+      "actions": [
+        {
+          "type": "activate",
+          "activation": {
+            "card": {
+              "id": 89023486,
+              "name": "Original Sinful Spoils - Snake-Eye"
+            },
+            "from": "hand",
+            "kind": "spell_card",
+            "effects": [
+              "ss_from_deck"
+            ],
+            "cost": "把自己场上 1 张其他表侧卡（Snake-Eyes Poplar）送去墓地",
+            "result": [
+              {
+                "id": 45663742,
+                "name": "Snake-Eye Oak"
+              }
+            ]
+          }
+        },
+        {
+          "type": "resolve_summon",
+          "summon": {
+            "card": {
+              "id": 45663742,
+              "name": "Snake-Eye Oak"
+            },
+            "method": "special",
+            "from": "deck"
+          }
+        }
+      ],
+      "moves": [
+        {
+          "card": {
+            "id": 89023486,
+            "name": "Original Sinful Spoils - Snake-Eye"
+          },
+          "from": "hand",
+          "to": "spell_trap",
+          "slot": 2
+        },
+        {
+          "card": {
+            "id": 90241276,
+            "name": "Snake-Eyes Poplar"
+          },
+          "from": "monster",
+          "to": "gy"
+        },
+        {
+          "card": {
+            "id": 45663742,
+            "name": "Snake-Eye Oak"
+          },
+          "from": "deck",
+          "to": "monster",
+          "slot": 1
+        },
+        {
+          "card": {
+            "id": 89023486,
+            "name": "Original Sinful Spoils - Snake-Eye"
+          },
+          "from": "spell_trap",
+          "to": "gy"
+        }
+      ],
+      "notes": "Poplar 被作为 cost 送墓会触发 Poplar ③，这里先不发动，留到后面放 Ash。",
+      "interruptions": [
+        {
+          "handtrap": 14558127,
+          "impact": "reduced_endboard",
+          "note": "Poplar 已作为 cost 送墓拿不回来。场上只剩 Ash，可用 Ash ② 需要 2 张表侧卡，展开基本停在这里。"
+        }
+      ]
+    },
+    {
+      "id": "s6",
+      "title": "Oak ①：以墓地的 Poplar 为对象特殊召唤",
+      "actions": [
+        {
+          "type": "activate",
+          "activation": {
+            "card": {
+              "id": 45663742,
+              "name": "Snake-Eye Oak"
+            },
+            "from": "monster",
+            "kind": "monster_effect",
+            "effectIndex": 1,
+            "effects": [
+              "ss_from_gy",
+              "target_in_gy"
+            ]
+          }
+        },
+        {
+          "type": "resolve_summon",
+          "summon": {
+            "card": {
+              "id": 90241276,
+              "name": "Snake-Eyes Poplar"
+            },
+            "method": "special",
+            "from": "gy"
+          }
+        }
+      ],
+      "moves": [
+        {
+          "card": {
+            "id": 90241276,
+            "name": "Snake-Eyes Poplar"
+          },
+          "from": "gy",
+          "to": "monster",
+          "slot": 3
+        }
+      ],
+      "interruptions": [
+        {
+          "handtrap": 73642296,
+          "impact": "reduced_endboard",
+          "note": "只剩 Ash + Oak 两只，出不了公主；可以用 Oak ② 送 Ash + Oak 直接从卡组拉 Flamberge。"
+        }
+      ]
+    },
+    {
+      "id": "s7",
+      "title": "用 Ash + Oak + Poplar 连接召唤 Promethean Princess",
+      "actions": [
+        {
+          "type": "summon",
+          "summon": {
+            "card": {
+              "id": 2772337,
+              "name": "Promethean Princess, Bestower of Flames"
+            },
+            "method": "link",
+            "from": "extra",
+            "materials": [
+              {
+                "id": 9674034,
+                "name": "Snake-Eye Ash"
+              },
+              {
+                "id": 45663742,
+                "name": "Snake-Eye Oak"
+              },
+              {
+                "id": 90241276,
+                "name": "Snake-Eyes Poplar"
+              }
+            ]
+          }
+        }
+      ],
+      "moves": [
+        {
+          "card": {
+            "id": 9674034,
+            "name": "Snake-Eye Ash"
+          },
+          "from": "monster",
+          "to": "gy"
+        },
+        {
+          "card": {
+            "id": 45663742,
+            "name": "Snake-Eye Oak"
+          },
+          "from": "monster",
+          "to": "gy"
+        },
+        {
+          "card": {
+            "id": 90241276,
+            "name": "Snake-Eyes Poplar"
+          },
+          "from": "monster",
+          "to": "gy"
+        },
+        {
+          "card": {
+            "id": 2772337,
+            "name": "Promethean Princess, Bestower of Flames"
+          },
+          "from": "extra",
+          "to": "emz",
+          "slot": 0
+        }
+      ],
+      "notes": "从这里开始只能特召炎属性怪兽（公主的限制）。",
+      "interruptions": [
+        {
+          "handtrap": 27204311,
+          "impact": "minor",
+          "note": "第 5 次召唤时场上只有公主一只，尼比鲁收益很低；对手更可能等到 Flamberge 出场后再丢。"
+        }
+      ]
+    },
+    {
+      "id": "s8",
+      "title": "Poplar ③：以墓地的 Ash 为对象，当作永续魔法放置",
+      "actions": [
+        {
+          "type": "activate",
+          "activation": {
+            "card": {
+              "id": 90241276,
+              "name": "Snake-Eyes Poplar"
+            },
+            "from": "gy",
+            "kind": "monster_effect",
+            "effectIndex": 3,
+            "effects": [
+              "place_as_continuous_spell",
+              "target_in_gy"
+            ],
+            "result": [
+              {
+                "id": 9674034,
+                "name": "Snake-Eye Ash"
+              }
+            ]
+          }
+        }
+      ],
+      "moves": [
+        {
+          "card": {
+            "id": 9674034,
+            "name": "Snake-Eye Ash"
+          },
+          "from": "gy",
+          "to": "spell_trap",
+          "slot": 2
+        }
+      ],
+      "interruptions": [
+        {
+          "handtrap": 24508238,
+          "impact": "reduced_endboard",
+          "note": "除外 Ash 让效果落空；Oak ② 缺 1 张表侧卡，拉不出 Flamberge。"
+        }
+      ]
+    },
+    {
+      "id": "s9",
+      "title": "公主 ①：从墓地特召 Snake-Eye Oak",
+      "actions": [
+        {
+          "type": "activate",
+          "activation": {
+            "card": {
+              "id": 2772337,
+              "name": "Promethean Princess, Bestower of Flames"
+            },
+            "from": "monster",
+            "kind": "monster_effect",
+            "effectIndex": 1,
+            "effects": [
+              "ss_from_gy"
+            ]
+          }
+        },
+        {
+          "type": "resolve_summon",
+          "summon": {
+            "card": {
+              "id": 45663742,
+              "name": "Snake-Eye Oak"
+            },
+            "method": "special",
+            "from": "gy"
+          }
+        }
+      ],
+      "moves": [
+        {
+          "card": {
+            "id": 45663742,
+            "name": "Snake-Eye Oak"
+          },
+          "from": "gy",
+          "to": "monster",
+          "slot": 2
+        }
+      ]
+    },
+    {
+      "id": "s10",
+      "title": "Oak ②：送 Oak + 永续魔法的 Ash，从卡组特召 Snake-Eyes Flamberge Dragon",
+      "actions": [
+        {
+          "type": "activate",
+          "activation": {
+            "card": {
+              "id": 45663742,
+              "name": "Snake-Eye Oak"
+            },
+            "from": "monster",
+            "kind": "monster_effect",
+            "effectIndex": 2,
+            "effects": [
+              "ss_from_deck"
+            ],
+            "cost": "把包含这张卡的自己场上 2 张表侧卡（Oak、Ash）送去墓地",
+            "result": [
+              {
+                "id": 48452496,
+                "name": "Snake-Eyes Flamberge Dragon"
+              }
+            ]
+          }
+        },
+        {
+          "type": "resolve_summon",
+          "summon": {
+            "card": {
+              "id": 48452496,
+              "name": "Snake-Eyes Flamberge Dragon"
+            },
+            "method": "special",
+            "from": "deck"
+          }
+        }
+      ],
+      "moves": [
+        {
+          "card": {
+            "id": 45663742,
+            "name": "Snake-Eye Oak"
+          },
+          "from": "monster",
+          "to": "gy"
+        },
+        {
+          "card": {
+            "id": 9674034,
+            "name": "Snake-Eye Ash"
+          },
+          "from": "spell_trap",
+          "to": "gy"
+        },
+        {
+          "card": {
+            "id": 48452496,
+            "name": "Snake-Eyes Flamberge Dragon"
+          },
+          "from": "deck",
+          "to": "monster",
+          "slot": 2
+        }
+      ],
+      "interruptions": [
+        {
+          "handtrap": 14558127,
+          "impact": "reduced_endboard",
+          "note": "终场只剩公主。"
+        },
+        {
+          "handtrap": 10045474,
+          "applies": false,
+          "impact": "minor",
+          "note": "Oak 已作为 cost 离场，泡影没有对象可以无效这次发动。"
+        },
+        {
+          "handtrap": 97268402,
+          "applies": false,
+          "impact": "minor",
+          "note": "Oak 已作为 cost 离场，遮蒙者没有对象。"
+        },
+        {
+          "handtrap": 59438930,
+          "applies": false,
+          "impact": "minor",
+          "note": "Oak 已不在场上，幽鬼兔破坏不到。"
+        }
+      ]
+    }
+  ],
+  "endboard": {
+    "cards": [
+      {
+        "id": 2772337,
+        "name": "Promethean Princess, Bestower of Flames"
+      },
+      {
+        "id": 48452496,
+        "name": "Snake-Eyes Flamberge Dragon"
+      }
+    ],
+    "description": "公主 + Flamberge。Flamberge 对手回合可以把当作永续魔法的怪兽特召到自己场上；公主在墓地时，对手特召会触发破坏并自身复活。"
+  }
+}
