@@ -2,7 +2,7 @@ import { OcgLocation, OcgMessageType, OcgResponseType, type OcgResponse } from "
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadEngineData, type EngineData } from "../engine/data";
 import { freePlaces, type DuelSetup, type FieldCard } from "../engine/session";
-import { actionsForDrop, cardActions, extraSummons, type CardAction } from "../play/cardActions";
+import { actionsForDrop, cardActions, extraSummons, phaseChoices, type CardAction } from "../play/cardActions";
 import { CardMenu, type MenuState } from "../play/CardMenu";
 import { DeckSetup } from "../play/DeckSetup";
 import { DuelField, locKey, type CardLoc } from "../play/DuelField";
@@ -78,6 +78,7 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
   const [pile, setPile] = useState<PileView | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [floatHidden, setFloatHidden] = useState(false);
+  const [drawer, setDrawer] = useState(false);
   const pickRef = useRef<((loc: CardLoc) => boolean) | null>(null);
   const logRef = useRef<HTMLOListElement>(null);
   /** 拖到了哪一格：接下来引擎问放在哪里时直接用这一格。 */
@@ -177,31 +178,40 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
   const byAction = new Map<number, typeof session.log>();
   for (const l of session.log) byAction.set(l.action, [...(byAction.get(l.action) ?? []), l]);
 
+  const canUndo = !busy && session.ownResponseIndices().length > 0;
+  const tools = (
+    <>
+      <button className="btn" onClick={onBack}>
+        ← 牌组设置
+      </button>
+      <button className="btn" onClick={duel.undo} disabled={!canUndo}>
+        撤销
+      </button>
+      <button className="btn" onClick={() => void duel.run(session.setup)} disabled={busy} title="用同一手牌从头开始">
+        重来
+      </button>
+      {!session.setup.hand && (
+        <button className="btn" onClick={() => void duel.run({ ...session.setup, seed: Math.floor(Math.random() * 2 ** 31) })} disabled={busy} title="重新洗牌抽 5 张">
+          换一手
+        </button>
+      )}
+      <button
+        className="btn primary"
+        onClick={() => saveCombo(session)}
+        disabled={busy || !canExport(session)}
+        title={canExport(session) ? "把这一回合的操作保存成 combo 文件，可以在「打开」页上传查看" : "打完这一回合（结束回合）后才能保存"}
+      >
+        保存为 combo
+      </button>
+    </>
+  );
+  const closeDrawer = () => setDrawer(false);
+  const phases = phaseChoices(prompt);
+
   return (
-    <main className={`page play${drag.drag ? " dragging" : ""}`}>
+    <main className={`page play dueling${drag.drag ? " dragging" : ""}`}>
       <div className="play-bar">
-        <button className="btn" onClick={onBack}>
-          ← 牌组设置
-        </button>
-        <button className="btn" onClick={duel.undo} disabled={busy || session.ownResponseIndices().length === 0}>
-          撤销
-        </button>
-        <button className="btn" onClick={() => void duel.run(session.setup)} disabled={busy} title="用同一手牌从头开始">
-          重来
-        </button>
-        {!session.setup.hand && (
-          <button className="btn" onClick={() => void duel.run({ ...session.setup, seed: Math.floor(Math.random() * 2 ** 31) })} disabled={busy} title="重新洗牌抽 5 张">
-            换一手
-          </button>
-        )}
-        <button
-          className="btn primary"
-          onClick={() => saveCombo(session)}
-          disabled={busy || !canExport(session)}
-          title={canExport(session) ? "把这一回合的操作保存成 combo 文件，可以在「打开」页上传查看" : "打完这一回合（结束回合）后才能保存"}
-        >
-          保存为 combo
-        </button>
+        {tools}
         {busy && <span className="muted">引擎计算中…</span>}
         <span className="muted play-hint">把发光的手卡拖到场上出牌，点发光的卡发动效果</span>
       </div>
@@ -228,8 +238,29 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
             extraReady={extraReady}
           />
         </div>
-        <div className="play-side">
-          {prompt && idle && <PromptPanel data={data} prompt={prompt} focus={focus} pickRef={pickRef} onRespond={(r) => void respond(r)} />}
+        <div className={`play-side${drawer ? " open" : ""}`} aria-label="菜单">
+          <div className="drawer-head">
+            <strong>菜单</strong>
+            <button className="mini" onClick={closeDrawer}>
+              关闭
+            </button>
+          </div>
+          <div className="drawer-tools" onClick={(e) => (e.target as HTMLElement).closest("button") && closeDrawer()}>
+            {tools}
+          </div>
+          <p className="muted drawer-only">拖手卡到场上出牌；点发光的卡弹出按钮，再点一次直接发动。</p>
+          {prompt && idle && (
+            <PromptPanel
+              data={data}
+              prompt={prompt}
+              focus={focus}
+              pickRef={pickRef}
+              onRespond={(r) => {
+                closeDrawer();
+                void respond(r);
+              }}
+            />
+          )}
           {session.status === "turn_over" && (
             <section className="prompt done">
               <header>
@@ -265,10 +296,29 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
               ))}
             </ol>
           </section>
+          <div className="drawer-only">
+            <Credits />
+          </div>
         </div>
       </div>
+      {drawer && <div className="drawer-scrim" onClick={closeDrawer} />}
 
       <Credits />
+
+      <nav className="mobile-bar" aria-label="对局操作">
+        <button className="btn" onClick={() => setDrawer(true)}>
+          ☰ 菜单
+        </button>
+        <button className="btn" onClick={duel.undo} disabled={!canUndo}>
+          撤销
+        </button>
+        <span className="mb-status">{busy ? "计算中…" : session.status === "turn_over" ? "回合结束" : ""}</span>
+        {phases.map((c) => (
+          <button key={c.label} className="btn primary" disabled={busy} onClick={() => void respond(c.response)}>
+            {c.label}
+          </button>
+        ))}
+      </nav>
 
       <HitWindow data={data} hits={session.hits} actions={session.actions} busy={busy} onActivate={duel.activate} />
 

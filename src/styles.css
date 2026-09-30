@@ -690,3 +690,62 @@ button.slot:disabled { cursor: default; }
 .prompt-float.hidden .prompt > :not(header) { display: none; }
 .prompt-float.hidden .prompt { opacity: 0.92; }
 .prompt-tools { display: inline-flex; gap: 2px; flex: none; }
+
+/* 练习：手机上只留场地，其余放进侧拉菜单和底栏 */
+.drawer-head, .drawer-tools, .drawer-only, .mobile-bar, .drawer-scrim { display: none; }
+.duel-field { -webkit-touch-callout: none; }
+@media (hover: none) {
+  .hand-row .slot.draggable:hover .card { transform: none; }
+}
+@media (max-width: 760px) {
+  body:has(.page.play.dueling) .topbar { display: none; }
+  .page.play.dueling { padding: 6px 6px calc(62px + env(safe-area-inset-bottom, 0px)); gap: 6px; }
+  .page.play.dueling > .play-bar, .page.play.dueling > .credits { display: none; }
+  .play-grid { gap: 0; }
+
+  .play-side {
+    position: fixed; z-index: 36; top: 0; right: 0; bottom: 0; width: min(380px, 90vw);
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px)); overflow-y: auto; align-content: start;
+    background: var(--bg); box-shadow: -8px 0 28px rgba(0, 0, 0, 0.3);
+    transform: translateX(105%); transition: transform 0.2s ease; visibility: hidden;
+  }
+  .play-side.open { transform: none; visibility: visible; }
+  .drawer-head { display: flex; justify-content: space-between; align-items: center; font: 700 16px var(--display); }
+  .drawer-tools { display: flex; flex-wrap: wrap; gap: 6px; }
+  .drawer-only { display: block; }
+  .drawer-only .credits { display: block; }
+  .drawer-scrim { display: block; position: fixed; inset: 0; z-index: 35; background: rgba(0, 0, 0, 0.45); }
+  .play-side .prompt { position: static; max-height: none; box-shadow: none; }
+  .play-side .choice-groups { max-height: none; }
+
+  .mobile-bar {
+    display: flex; align-items: center; gap: 6px; position: fixed; z-index: 22; left: 0; right: 0; bottom: 0;
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+    background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
+  }
+  .mobile-bar .btn { padding: 7px 12px; }
+  .mb-status { flex: 1; min-width: 0; text-align: center; font-size: 12px; color: var(--muted); }
+
+  /* 场地铺满宽度，手卡和对手手卡各一行 */
+  .duel-field { gap: 4px; }
+  .mat-scroll { overflow: visible; }
+  .duel-field .mat { width: 100%; min-width: 0; padding: 5px; gap: 4px; border-radius: 8px; }
+  .slot .zlabel { font-size: 9px; }
+  .opp-hand, .duel-field .hand-row { display: grid; justify-content: center; gap: 3px; }
+  .opp-hand { grid-template-columns: repeat(var(--n), minmax(0, 28px)); }
+  .duel-field .hand-row { grid-template-columns: repeat(var(--n), minmax(0, 68px)); gap: 5px; }
+  .opp-hand .label, .duel-field .hand-row .label { grid-column: 1 / -1; font-size: 11px; line-height: 1.3; }
+  .opp-hand .slot, .duel-field .hand-row .slot { width: auto; }
+  .opp-hand .placeholder > * { display: none; }
+  .duel-field .hand-row { padding-top: 4px; }
+
+  .hit-window { top: calc(6px + env(safe-area-inset-top, 0px)); right: 6px; }
+  .hit-window.collapsed { width: auto; }
+  .hit-window.collapsed header { padding: 3px 8px; }
+  /* 放在上半部分（对手那边），自己的怪兽区和手卡留出来，可以直接在场上点选 */
+  .prompt-float { top: calc(6px + env(safe-area-inset-top, 0px)); bottom: auto; width: calc(100vw - 12px); }
+  .prompt-float .prompt { max-height: 46vh; }
+  .pick-grid { grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); }
+  .card-menu .btn.small { font-size: 14px; padding: 8px 12px; }
+  .drag-ghost { width: 56px; }
+}

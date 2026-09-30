@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { EngineData } from "../engine/data";
 import { autoRespond, freePlaces, locName, type Prompt } from "../engine/session";
 import { CardView } from "../ui/CardView";
-import { activationText, cardActions } from "./cardActions";
+import { activationText, cardActions, phaseChoices } from "./cardActions";
 import { locKey, type CardLoc } from "./DuelField";
 import { ATTRIBUTES, describe, placeLabel, POSITION_LABEL, RACES } from "./text";
 
@@ -72,14 +72,7 @@ export function PromptPanel({ data, prompt, focus, pickRef, onRespond, headerExt
     case OcgMessageType.SELECT_BATTLECMD: {
       const groups = [...cardActions(data, prompt).values()].map((g) => ({ ...g, choices: g.actions as Choice[] }));
       const list = groups.sort((a, b) => Number(locKey(b.loc) === focus) - Number(locKey(a.loc) === focus));
-      const end: Choice[] = [];
-      if (m.type === OcgMessageType.SELECT_IDLECMD) {
-        if (m.to_bp) end.push({ label: "进入战斗阶段", response: { type: OcgResponseType.SELECT_IDLECMD, action: 6, index: null } });
-        if (m.to_ep) end.push({ label: "结束回合", response: { type: OcgResponseType.SELECT_IDLECMD, action: 7, index: null } });
-      } else {
-        if (m.to_m2) end.push({ label: "进入主要阶段 2", response: { type: OcgResponseType.SELECT_BATTLECMD, action: 2, index: null } });
-        if (m.to_ep) end.push({ label: "结束回合", response: { type: OcgResponseType.SELECT_BATTLECMD, action: 3, index: null } });
-      }
+      const end: Choice[] = phaseChoices(prompt);
       body = (
         <>
           {list.length === 0 && <p className="muted">现在没有可以做的操作。</p>}

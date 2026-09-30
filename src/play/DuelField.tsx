@@ -142,7 +142,7 @@ export function DuelField({ me, opp, lp, ...ctx }: Props) {
   };
   return (
     <div className="duel-field">
-      <div className="opp-hand">
+      <div className="opp-hand" style={{ ["--n" as string]: Math.max(1, opp.hand.length) }}>
         <span className="label">
           对手 LP {lp[1]} · 手卡 {opp.hand.length}
         </span>
@@ -187,7 +187,7 @@ export function DuelField({ me, opp, lp, ...ctx }: Props) {
           <DeckPile count={me.deck} label="卡组" />
         </div>
       </div>
-      <div className="hand-row">
+      <div className="hand-row" style={{ ["--n" as string]: Math.max(1, me.hand.length) }}>
         <span className="label">
           自己 LP {lp[0]} · 手卡 {me.hand.length}
         </span>

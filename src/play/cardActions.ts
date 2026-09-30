@@ -69,3 +69,17 @@ export function actionsForDrop(acts: CardAction[], zone: CardLoc | null): { list
 export function extraSummons(all: Map<string, CardActions>): CardActions[] {
   return [...all.values()].filter((c) => c.loc.controller === 0 && c.loc.location === OcgLocation.EXTRA && c.actions.some((a) => a.kind === "special"));
 }
+
+/** 空闲 / 战斗阶段时推进阶段的按钮：进入战斗阶段、结束回合等。 */
+export function phaseChoices(prompt: Prompt | null): { label: string; response: OcgResponse }[] {
+  const m = prompt?.msg;
+  const out: { label: string; response: OcgResponse }[] = [];
+  if (m?.type === OcgMessageType.SELECT_IDLECMD) {
+    if (m.to_bp) out.push({ label: "进入战斗阶段", response: { type: OcgResponseType.SELECT_IDLECMD, action: 6, index: null } });
+    if (m.to_ep) out.push({ label: "结束回合", response: { type: OcgResponseType.SELECT_IDLECMD, action: 7, index: null } });
+  } else if (m?.type === OcgMessageType.SELECT_BATTLECMD) {
+    if (m.to_m2) out.push({ label: "进入主要阶段 2", response: { type: OcgResponseType.SELECT_BATTLECMD, action: 2, index: null } });
+    if (m.to_ep) out.push({ label: "结束回合", response: { type: OcgResponseType.SELECT_BATTLECMD, action: 3, index: null } });
+  }
+  return out;
+}
