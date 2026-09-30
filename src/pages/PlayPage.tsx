@@ -1,7 +1,9 @@
 import { OcgLocation, OcgMessageType, OcgResponseType, type OcgResponse } from "ocgcore-wasm";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadEngineData, type EngineData } from "../engine/data";
-import { freePlaces, type DuelSetup, type FieldCard } from "../engine/session";
+import { freePlaces, type DuelSession, type DuelSetup, type FieldCard } from "../engine/session";
+import { comboStore } from "../data/store";
+import { href, navigate } from "../router";
 import { actionsForDrop, cardActions, extraSummons, phaseChoices, type CardAction } from "../play/cardActions";
 import { CardMenu, type MenuState } from "../play/CardMenu";
 import { DeckSetup } from "../play/DeckSetup";
@@ -10,7 +12,7 @@ import { GainsPanel } from "../play/GainsPanel";
 import { HitWindow } from "../play/HitWindow";
 import { PromptPanel } from "../play/PromptPanel";
 import { canExport, toCombo } from "../play/toCombo";
-import { useDuel } from "../play/useDuel";
+import { forgetDuel, savedDuel, useDuel } from "../play/useDuel";
 import { useHandDrag } from "../play/useHandDrag";
 import { CardView } from "../ui/CardView";
 import { downloadCombo } from "../ui/download";
@@ -33,6 +35,18 @@ export default function PlayPage() {
   useEffect(() => {
     loadEngineData().then(setData, (e: unknown) => setLoadError(e instanceof Error ? e.message : String(e)));
   }, []);
+
+  // 从分析页回来（或刷新）时接着上次的对局
+  const resumed = useRef(false);
+  useEffect(() => {
+    if (!data || resumed.current) return;
+    resumed.current = true;
+    const saved = savedDuel();
+    if (saved) {
+      setPlaying(true);
+      void duel.run(saved.setup, saved.responses);
+    }
+  }, [data, duel]);
 
   const start = (setup: DuelSetup) => {
     setPlaying(true);
@@ -69,7 +83,16 @@ export default function PlayPage() {
       </main>
     );
   }
-  return <Duel data={data} duel={duel} onBack={() => setPlaying(false)} />;
+  return (
+    <Duel
+      data={data}
+      duel={duel}
+      onBack={() => {
+        forgetDuel();
+        setPlaying(false);
+      }}
+    />
+  );
 }
 
 function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeof useDuel>; onBack: () => void }) {
@@ -203,6 +226,14 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
       >
         保存为 combo
       </button>
+      <button
+        className="btn primary"
+        onClick={() => analyzeCombo(session)}
+        disabled={busy || !canExport(session)}
+        title={canExport(session) ? "打开这条 combo 的分析页：手坑优先级、每一步能吃哪些手坑" : "打完这一回合（结束回合）后才能分析"}
+      >
+        分析这条 combo
+      </button>
     </>
   );
   const closeDrawer = () => setDrawer(false);
@@ -269,7 +300,12 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
               <p>
                 这就是你的终场：场上 {me.monsters.filter(Boolean).length} 只怪兽、{me.spells.filter(Boolean).length} 张魔陷，手卡 {me.hand.length} 张。
               </p>
-              <p className="muted">可以撤销回去换一条路线，或者在吃坑点让对手发动手坑，看被打断后还能做什么。点上面的「保存为 combo」可以把这条路线存成文件，之后在「打开」页上传查看。</p>
+              <p className="muted">可以撤销回去换一条路线，或者在吃坑点让对手发动手坑，看被打断后还能做什么。「保存为 combo」把这条路线存成文件；「分析这条 combo」直接打开分析页，看手坑优先级。</p>
+              <div className="prompt-foot">
+                <button className="btn primary" onClick={() => analyzeCombo(session)}>
+                  分析这条 combo
+                </button>
+              </div>
             </section>
           )}
           {session.status === "error" && (
@@ -313,6 +349,11 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
           撤销
         </button>
         <span className="mb-status">{busy ? "计算中…" : session.status === "turn_over" ? "回合结束" : ""}</span>
+        {session.status === "turn_over" && canExport(session) && (
+          <button className="btn primary" onClick={() => analyzeCombo(session)}>
+            分析
+          </button>
+        )}
         {phases.map((c) => (
           <button key={c.label} className="btn primary" disabled={busy} onClick={() => void respond(c.response)}>
             {c.label}
@@ -405,6 +446,23 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
       )}
     </main>
   );
+}
+
+/** 同一局同一条路线重复点「分析」时沿用同一个 id，分析页上的手动调整不会丢。 */
+const analyzed = new WeakMap<DuelSession, { at: number; id: string }>();
+
+/** 存进「我的 combo」并打开分析页。对局存在 sessionStorage，从分析页回来还能接着打。 */
+function analyzeCombo(session: DuelSession) {
+  try {
+    const combo = toCombo(session);
+    const prev = analyzed.get(session);
+    if (prev && prev.at === session.responses.length) combo.id = prev.id;
+    analyzed.set(session, { at: session.responses.length, id: combo.id });
+    comboStore.save([combo]);
+    navigate(href.analyze(combo.id));
+  } catch (e) {
+    window.alert(`分析失败：${e instanceof Error ? e.message : String(e)}`);
+  }
 }
 
 /** 导出成 combo JSON 并下载。 */

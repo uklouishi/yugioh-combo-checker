@@ -750,3 +750,29 @@ button.slot:disabled { cursor: default; }
   .card-menu .btn.small { font-size: 14px; padding: 8px 12px; }
   .drag-ghost { width: 56px; }
 }
+
+/* 分析页：手坑优先级 */
+.report { display: grid; gap: 20px; min-width: 0; }
+.prio-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.prio {
+  display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 10px; align-items: center;
+  background: var(--cbg); border: 1px solid transparent; border-left: 4px solid var(--c); border-radius: 0 8px 8px 0; padding: 8px 10px;
+}
+.prio.on { border-color: var(--c); }
+.prio-rank { font: 700 18px var(--mono); color: var(--c); text-align: center; }
+.prio-main { display: flex; gap: 10px; align-items: flex-start; min-width: 0; }
+.prio-text { border: 0; background: none; padding: 0; text-align: left; color: inherit; font: inherit; cursor: pointer; min-width: 0; }
+.prio-main .thumb { position: relative; flex: none; width: 34px; aspect-ratio: 59 / 86; }
+.prio-main .thumb .placeholder > * { display: none; }
+.prio-text { display: grid; gap: 2px; min-width: 0; }
+.prio-name { font-weight: 700; overflow-wrap: anywhere; }
+.prio-reason { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.prio-side { display: grid; gap: 4px; justify-items: end; }
+.prio-impact { font: 700 12px var(--body); color: var(--c); border-color: var(--c); background: var(--surface); padding: 2px 4px; }
+.prio-bar { width: 72px; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.prio-bar > span { display: block; height: 100%; background: var(--c); }
+.prio-move { display: flex; gap: 2px; }
+@media (max-width: 560px) {
+  .prio { grid-template-columns: 22px minmax(0, 1fr); }
+  .prio-side { grid-column: 2; grid-template-columns: auto 1fr auto; align-items: center; justify-items: start; }
+}

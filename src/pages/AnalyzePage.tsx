@@ -1,20 +1,18 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useCards } from "../cards/useCards";
 import { handtrapById, handtraps as catalog } from "../data";
 import { useCombos } from "../data/store";
 import { analyzeCombo } from "../model/analysis";
+import { handtrapPriorities } from "../model/priority";
 import type { Interruption } from "../model/interruptions";
 import type { Combo } from "../model/schema";
 import { href } from "../router";
-import { CardView } from "../ui/CardView";
+import { downloadPng } from "../ui/download";
+import { IMPACT_LABEL, PriorityPanel } from "../ui/PriorityPanel";
+
+export { IMPACT_LABEL };
 import { NotFound } from "./NotFound";
 
-export const IMPACT_LABEL: Record<string, string> = {
-  combo_ends: "直接断",
-  reroute: "有备用路线",
-  reduced_endboard: "终场变弱",
-  minor: "影响小",
-};
 const TIMING: Record<string, string> = {
   chain_to_activation: "连锁发动",
   after_summon: "召唤成功后",
@@ -66,67 +64,72 @@ function Picker({ combos }: { combos: Combo[] }) {
 function Analysis({ combo }: { combo: Combo }) {
   const a = useMemo(() => analyzeCombo(combo), [combo]);
   const cards = useCards(catalog.map((h) => h.id));
-  const [selected, setSelected] = useState<Interruption | null>(a.handtraps[0]?.worst ?? null);
+  const [selected, setSelected] = useState<Interruption | null>(() => handtrapPriorities(combo)[0]?.hit ?? null);
+  const report = useRef<HTMLDivElement>(null);
+  const [exporting, setExporting] = useState(false);
   const stepNo = (stepId: string) => combo.steps.findIndex((s) => s.id === stepId) + 1;
   const name = (id: number) => handtrapById.get(id)?.name ?? String(id);
   const safe = catalog.filter((h) => !a.handtraps.some((s) => s.handtrap === h.id));
 
+  const exportPng = async () => {
+    if (!report.current) return;
+    setExporting(true);
+    try {
+      await downloadPng(report.current, `${combo.id.replace(/[^\w-]+/g, "-")}-analysis.png`);
+    } catch (e) {
+      window.alert(`导出失败：${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <main className="page">
-      <div className="page-head">
-        <div>
-          <div className="eyebrow">
-            {combo.deck} · {combo.format} · 分析
+      <div className="report" ref={report}>
+        <div className="page-head">
+          <div>
+            <div className="eyebrow">
+              {combo.deck} · {combo.format} · 分析
+            </div>
+            <h1>{combo.title}</h1>
           </div>
-          <h1>{combo.title}</h1>
+          <div className="actions no-export">
+            {combo.id.startsWith("play-") && (
+              <a className="btn" href={href.play()}>
+                ← 回到练习
+              </a>
+            )}
+            <button className="btn" onClick={() => void exportPng()} disabled={exporting}>
+              {exporting ? "导出中…" : "导出 PNG"}
+            </button>
+            <a className="btn primary" href={href.view(combo.id)}>
+              在场地上播放
+            </a>
+          </div>
         </div>
-        <div className="actions">
-          <a className="btn primary" href={href.view(combo.id)}>
-            在场地上播放
-          </a>
-        </div>
-      </div>
 
-      <section className="stats">
-        <div>
-          <span className="num">{a.stepCount}</span>
-          <span className="lbl">步骤</span>
-        </div>
-        <div>
-          <span className="num">{a.normalSummons + a.specialSummons}</span>
-          <span className="lbl">召唤（其中特召 {a.specialSummons}）</span>
-        </div>
-        <div>
-          <span className="num">{a.handtraps.length}</span>
-          <span className="lbl">种手坑能打</span>
-        </div>
-        <div className={a.firstComboEnd ? "s-combo_ends" : ""}>
-          <span className="num">{a.firstComboEnd ? `第 ${a.firstComboEnd} 步` : "无"}</span>
-          <span className="lbl">最早可能被直接断</span>
-        </div>
-      </section>
+        <section className="stats">
+          <div>
+            <span className="num">{a.stepCount}</span>
+            <span className="lbl">步骤</span>
+          </div>
+          <div>
+            <span className="num">{a.normalSummons + a.specialSummons}</span>
+            <span className="lbl">召唤（其中特召 {a.specialSummons}）</span>
+          </div>
+          <div>
+            <span className="num">{a.handtraps.length}</span>
+            <span className="lbl">种手坑能打</span>
+          </div>
+          <div className={a.firstComboEnd ? "s-combo_ends" : ""}>
+            <span className="num">{a.firstComboEnd ? `第 ${a.firstComboEnd} 步` : "无"}</span>
+            <span className="lbl">最早可能被直接断</span>
+          </div>
+        </section>
 
-      <section>
-        <h2 className="section-title">手坑威胁排行</h2>
-        <p className="muted">按最坏后果排序，同级按最早能打的步骤排序。点一行看具体说明。</p>
-        <ul className="threats">
-          {a.handtraps.map((t) => (
-            <li key={t.handtrap}>
-              <button className={`threat ${cls(t.worst)}${selected === t.worst ? " on" : ""}`} onClick={() => setSelected(t.worst)}>
-                <span className="thumb">
-                  <CardView id={t.handtrap} name={name(t.handtrap)} info={cards.get(t.handtrap)} />
-                </span>
-                <span className="tname">{name(t.handtrap)}</span>
-                <span className="tag-impact">{label(t.worst)}</span>
-                <span className="muted">
-                  最早第 {t.firstStep} 步 · 共 {t.steps.length} 个时点
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <PriorityPanel combo={combo} name={name} cards={cards} selected={selected} onSelect={setSelected} />
         {safe.length > 0 && <p className="muted">这条展开不吃：{safe.map((h) => h.name).join(", ")}。</p>}
-      </section>
+      </div>
 
       <section>
         <h2 className="section-title">手坑 × 步骤</h2>
