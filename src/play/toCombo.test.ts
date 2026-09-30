@@ -5,6 +5,7 @@ import { handtraps } from "../data";
 import { EngineData } from "../engine/data";
 import { startDuel } from "../engine/run";
 import type { DuelSession, DuelSetup } from "../engine/session";
+import { buildBeats } from "../model/playback";
 import { simulate } from "../model/board";
 import { checkCombos } from "../model/validate";
 import { canExport, toCombo } from "./toCombo";
@@ -92,5 +93,12 @@ describe("toCombo", () => {
     expect(last.gy.map((p) => p.card.id)).toContain(ASH);
     expect(last.hand.map((p) => p.card.id)).toContain(POPLAR);
     expect(checkCombos([combo], handtraps)).toEqual([]);
+
+    // 播放：召唤 → CHAIN 1 发动 Ash → 处理时检索 Poplar
+    const beats = buildBeats(combo.steps[0], frames[0].board);
+    expect(beats.at(-1)!.board).toEqual(frames[1].board);
+    expect(beats.map((b) => b.kind)).toEqual(["summon", "move", "activate", "resolve", "move"]);
+    expect(beats.find((b) => b.kind === "activate")?.caption).toContain("CHAIN 1");
+    expect(beats.find((b) => b.move?.card.id === POPLAR)?.move?.resolving).toBe(1);
   });
 });

@@ -92,6 +92,8 @@ export const Activation = z.object({
   effects: z.array(EffectTag),
   /** cost（发动时就已支付，无效发动也拿不回来）。 */
   cost: z.string().optional(),
+  /** 这次发动是连锁的第几环（1 起）。不写时播放按同一步里发动的先后顺序编号。 */
+  chainLink: z.number().int().positive().optional(),
   /** 效果处理结果，比如检索到的卡。 */
   result: z.array(CardRef).optional(),
 });
@@ -144,6 +146,13 @@ export const Move = z.object({
   faceDown: z.boolean().optional(),
   /** 守备表示。 */
   defense: z.boolean().optional(),
+  /**
+   * 这次移动发生在这一步的第几个 action 之后（0 = 第一个 action 之前）。
+   * 不写时播放把它放在所有 action 之后。实战练习导出时会记下。
+   */
+  afterAction: z.number().int().min(0).optional(),
+  /** 移动发生时正在处理的连锁环（比如 2 表示 CHAIN 2 的效果处理中）。 */
+  resolving: z.number().int().positive().optional(),
 });
 export type Move = z.infer<typeof Move>;
 

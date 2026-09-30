@@ -782,3 +782,41 @@ button.slot:disabled { cursor: default; }
   .prio { grid-template-columns: 22px minmax(0, 1fr); }
   .prio-side { grid-column: 2; grid-template-columns: auto 1fr auto; align-items: center; justify-items: start; }
 }
+
+/* combo 播放：解说条、连锁序号、飞行中的卡 */
+.field-wrap { display: grid; gap: 14px; }
+.beat-caption {
+  min-height: 64px; display: grid; gap: 6px; align-content: center;
+  padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface);
+  transition: border-color 0.2s, background 0.2s;
+}
+.beat-caption .text { font-weight: 700; line-height: 1.45; }
+.beat-caption:not(.live) .text { font-weight: 500; color: var(--muted); }
+.beat-caption.live { border-color: var(--glow); background: color-mix(in srgb, var(--glow) 12%, var(--surface)); }
+.chain-list { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--muted); }
+.chain-list li.active { color: var(--fg); }
+.chain-list b { font: 700 11px var(--mono); color: var(--accent); }
+.link-badges { position: absolute; left: 50%; top: -9px; z-index: 4; display: grid; gap: 2px; justify-items: center; transform: translateX(-50%); pointer-events: none; }
+.link-badge {
+  display: inline-block; white-space: nowrap;
+  font: 700 9px/1 var(--mono); letter-spacing: 0.04em;
+  padding: 3px 5px; border-radius: 3px;
+  background: #1b1f27; color: var(--glow); border: 1px solid var(--glow);
+}
+.link-badge.active { background: var(--glow); color: #1b1f27; }
+.slot.activating { z-index: 3; }
+.slot.activating .card { box-shadow: 0 0 0 3px var(--glow), 0 0 18px 6px var(--glow); animation: activate-pulse 0.75s ease-in-out 2; }
+@keyframes activate-pulse { 50% { transform: scale(1.12); } }
+.slot.activating .card.defense { animation: none; }
+.flying-card { position: fixed; z-index: 40; pointer-events: none; transform-origin: 0 0; }
+.flying-card img { color: transparent; }
+.flying-card .card { box-shadow: 0 0 0 2px var(--glow), 0 10px 24px rgba(0, 0, 0, 0.5); }
+.step-actions { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: 12px; }
+.step-actions .link-badge { margin-right: 2px; }
+.step-panel .mini.replay { justify-self: start; padding: 2px 0; color: var(--accent); }
+.step-panel .mini.replay:disabled { color: var(--muted); cursor: default; }
+@media (prefers-reduced-motion: reduce) {
+  .slot.activating .card { animation: none; }
+}
+/* 解说条占了一点高度，场地相应缩小，让自己的手卡、卡组也尽量在一屏里 */
+.field-wrap .mat { width: min(100%, max(340px, calc(100vh - 360px))); }

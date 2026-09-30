@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
 import type { CardInfo } from "../cards/ygoprodeck";
 import type { Interruption } from "../model/interruptions";
-import type { Combo, Handtrap } from "../model/schema";
+import { describeActivation, describeSummon } from "../model/playback";
+import type { Combo, Handtrap, Step } from "../model/schema";
 import { CardView } from "./CardView";
 
 const IMPACT: Record<string, string> = {
@@ -25,10 +26,36 @@ interface Props {
   cards: Map<number, CardInfo>;
   onFrame: (frame: number) => void;
   onOpen: (id: number) => void;
+  /** 正在播放这一步的动画。 */
+  playing?: boolean;
+  onReplay?: () => void;
+}
+
+/** 这一步里发生的事：发动带连锁序号，召唤写召唤方式。 */
+function StepActions({ step }: { step: Step }) {
+  let link = 0;
+  const lines = step.actions.flatMap((a) => {
+    if (a.type === "activate") {
+      link = a.activation.chainLink ?? link + 1;
+      return [{ chain: link, text: describeActivation(a.activation) }];
+    }
+    if (a.type === "summon") return [{ chain: 0, text: describeSummon(a.summon) }];
+    return [];
+  });
+  if (!lines.length) return null;
+  return (
+    <ol className="step-actions">
+      {lines.map((l, i) => (
+        <li key={i}>
+          {l.chain > 0 && <span className="link-badge">CHAIN {l.chain}</span>} {l.text}
+        </li>
+      ))}
+    </ol>
+  );
 }
 
 /** 切换步骤的悬浮窗：可以拖动、可以收起，不挡场地。 */
-export function StepPanel({ combo, frame, hits, handtraps, cards, onFrame, onOpen }: Props) {
+export function StepPanel({ combo, frame, hits, handtraps, cards, onFrame, onOpen, playing, onReplay }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
@@ -73,6 +100,12 @@ export function StepPanel({ combo, frame, hits, handtraps, cards, onFrame, onOpe
           {step ? (
             <>
               <div className="stitle">{step.title}</div>
+              <StepActions step={step} />
+              {onReplay && (
+                <button className="mini replay" onClick={onReplay} disabled={playing}>
+                  {playing ? "演示中…" : "↻ 重播这一步的动画"}
+                </button>
+              )}
               {step.notes && <div className="snote">备注：{step.notes}</div>}
               {stepHits.length === 0 && <div className="safe">这一步没有常见手坑能打。</div>}
               {stepHits.map((h) => {
