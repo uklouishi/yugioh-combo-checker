@@ -173,6 +173,18 @@ describe("DuelSession", () => {
     expect(t.field()[1].hand).toHaveLength(1);
   });
 
+  it.each([["Fuwalos", 42141493, 1], ["Purulia", 84192580, 0], ["Meowls", 87126721, 0]])("Mulcharmy %s draws only on its own summon condition (Albaz from the Deck)", async (_, code, expected) => {
+    const setup = eccSetup([code]);
+    const s = await startDuel(eccCore(), data, setup);
+    const hit = s.hits.find((h) => h.options.some((o) => o.code === code))!;
+    expect(hit).toBeDefined();
+    const t = await startDuel(eccCore(), data, setup, activateAt(s, hit, hit.options.find((o) => o.code === code)!.index));
+    while (t.status === "prompt" && t.prompt!.msg.type === OcgMessageType.SELECT_CHAIN) t.respond({ type: OcgResponseType.SELECT_CHAIN, index: null });
+    expect(t.gains.activated.map((a) => a.code)).toEqual([code]);
+    eccSummonAlbaz(t);
+    expect(t.gains.draws.reduce((n, d) => n + d.count, 0)).toBe(expected);
+  });
+
   it("lets the opponent reveal 5 Synchros with Fydraulis Harmonia, send the chosen one and use its effect", async () => {
     const setup = { ...eccSetup([HARMONIA]), extra: [ECCLESIA_DARK_DRAGON, ECCLESIA_DARK_DRAGON], opponentExtra: [MALONG, ...Array(4).fill(GAIA_KNIGHT)], opponentSynchro: MALONG };
     const s = await startDuel(eccCore(), data, setup);

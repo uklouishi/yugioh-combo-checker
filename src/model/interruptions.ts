@@ -15,6 +15,9 @@ export const HT = {
   GHOST_BELLE: 73642296,
   DD_CROW: 24508238,
   CALLED_BY: 24224830,
+  FUWALOS: 42141493,
+  PURULIA: 84192580,
+  MEOWLS: 87126721,
 } as const;
 
 export type Timing =
@@ -44,6 +47,31 @@ const isSpecial = (action: StepAction) =>
   (action.type === "summon" || action.type === "resolve_summon") && action.summon.method !== "normal";
 
 const isSummon = (action: StepAction) => action.type === "summon" || action.type === "resolve_summon";
+
+const summonFrom = (a: StepAction) => (a.type === "activate" ? undefined : a.summon.from);
+
+/**
+ * Maxx "C" 类手坑各自的抽卡条件：对方哪种召唤会让你抽 1 张。
+ * Mulcharmy 还要求自己场上没有卡，先攻展开时对手场上是空的，所以不另外判断。
+ */
+export const DRAW_CONDITIONS: Array<{ handtrap: number; when: string; draws: (action: StepAction) => boolean }> = [
+  { handtrap: HT.MAXX_C, when: "特殊召唤", draws: isSpecial },
+  {
+    handtrap: HT.FUWALOS,
+    when: "从卡组或额外卡组特殊召唤",
+    draws: (a) => isSpecial(a) && ["deck", "extra"].includes(summonFrom(a)!),
+  },
+  { handtrap: HT.PURULIA, when: "从手卡通常召唤或特殊召唤", draws: (a) => summonFrom(a) === "hand" },
+  {
+    handtrap: HT.MEOWLS,
+    when: "从墓地或除外状态特殊召唤",
+    draws: (a) => isSpecial(a) && ["gy", "banished"].includes(summonFrom(a)!),
+  },
+];
+
+/** 这次召唤会不会让发动了某张 Maxx "C" 类手坑的对手抽卡。 */
+export const drawsFor = (handtrap: number, action: StepAction) =>
+  DRAW_CONDITIONS.find((d) => d.handtrap === handtrap)?.draws(action) ?? false;
 
 /** 单个发动能被哪些「连锁型」手坑命中。 */
 function activationHits(a: Activation): Array<{ handtrap: number; reason: string }> {
@@ -76,7 +104,7 @@ function activationHits(a: Activation): Array<{ handtrap: number; reason: string
 export function deriveInterruptions(combo: Combo): Interruption[] {
   const out: Interruption[] = [];
   let summons = 0;
-  let maxxFlagged = false;
+  const drawFlagged = new Set<number>();
   let nibiruFlagged = false;
 
   for (const step of combo.steps) {
@@ -96,14 +124,15 @@ export function deriveInterruptions(combo: Combo): Interruption[] {
           });
         }
       }
-      if (isSpecial(action) && !maxxFlagged) {
-        maxxFlagged = true;
+      for (const d of DRAW_CONDITIONS) {
+        if (drawFlagged.has(d.handtrap) || !d.draws(action)) continue;
+        drawFlagged.add(d.handtrap);
         auto.push({
-          handtrap: HT.MAXX_C,
+          handtrap: d.handtrap,
           stepId: step.id,
           actionIndex,
           timing: "after_summon",
-          reason: "本回合第一次特殊召唤，之后每次特召对手都会抽卡",
+          reason: `本回合第一次${d.when}，之后每次${d.when}对手都会抽卡`,
         });
       }
       if (isSummon(action)) {
