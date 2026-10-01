@@ -25,6 +25,15 @@ export interface HandOptions {
   wildcardOk: (starter: Starter, id: number) => boolean;
 }
 
+export interface HandtrapOutcome {
+  /** 一张重要终端都打不出来。 */
+  stop: number;
+  /** 重要终端变少。 */
+  cut: number;
+  /** 重要终端不受影响。 */
+  none: number;
+}
+
 export interface HandStats {
   size: number;
   hands: number;
@@ -49,6 +58,8 @@ export interface HandStats {
   played: number;
   /** 手坑 → 按起手加权、考虑补点后平均打掉的重要终端占比。 */
   weighted: Record<number, number>;
+  /** 手坑 → 在所有起手里的结果分布（占全部起手的比例）。 */
+  outcomes: Record<number, HandtrapOutcome>;
   /** 动作签名 → 在有路线的起手里绕不开它的占比。 */
   unavoidable: Record<string, number>;
 }
@@ -94,6 +105,7 @@ export function simulateHands(study: DeckStudy, cmp: StudyComparison, opts: Hand
   const per: Record<string, number> = {};
   const weighted: Record<number, number> = {};
   const unavoidable: Record<string, number> = {};
+  const outcomes: Record<number, HandtrapOutcome> = {};
 
   for (let k = 0; k < n; k++) {
     // 部分洗牌：只洗出前 size 张
@@ -128,9 +140,35 @@ export function simulateHands(study: DeckStudy, cmp: StudyComparison, opts: Hand
     const played = avail.map((a) => routes.get(a.s.id)).filter((r): r is NonNullable<typeof r> => !!r && r.keyEnd.length > 0);
     if (!played.length) continue;
     c.played++;
+    // 每条路线能接上的补点：卡不重叠，两边不都用通常召唤
+    const playable = avail.filter((a) => played.some((r) => r.starter.id === a.s.id));
+    const backups = new Map(
+      playable.map((a) => {
+        const ra = routes.get(a.s.id)!;
+        const bs = playable
+          .filter((b) => b.s.id !== a.s.id && !(ra.normalSummon && routes.get(b.s.id)!.normalSummon) && useStarter(b.s, hand, opts.wildcardOk, a.used))
+          .map((b) => routes.get(b.s.id)!);
+        return [a.s.id, bs];
+      }),
+    );
+    const baseline = Math.max(...played.map((r) => r.keyEnd.length));
     for (const h of cmp.handtraps) {
-      const loss = Math.min(...played.map((r) => h.byRoute[r.starter.id] ?? 0));
-      weighted[h.handtrap] = (weighted[h.handtrap] ?? 0) + loss;
+      let after = 0;
+      for (const r of played) {
+        const options = h.options[r.starter.id] ?? [];
+        let worst = r.keyEnd.length;
+        for (const o of options) {
+          let best = r.keyEnd.length - o.keyLost;
+          for (const b of backups.get(r.starter.id) ?? []) best = Math.max(best, b.keyEnd.length - (b.sigLoss[o.sig] ?? 0));
+          worst = Math.min(worst, best);
+        }
+        after = Math.max(after, worst);
+      }
+      weighted[h.handtrap] = (weighted[h.handtrap] ?? 0) + 1 - after / baseline;
+      const out = (outcomes[h.handtrap] ??= { stop: 0, cut: 0, none: 0 });
+      if (after === 0) out.stop++;
+      else if (after < baseline) out.cut++;
+      else out.none++;
     }
     const common = played.slice(1).reduce((acc, r) => acc.filter((x) => r.sigs.includes(x)), played[0].sigs);
     for (const sig of common) unavoidable[sig] = (unavoidable[sig] ?? 0) + 1;
@@ -152,6 +190,7 @@ export function simulateHands(study: DeckStudy, cmp: StudyComparison, opts: Hand
     perStarter: norm(per, n),
     played: pct(c.played, n),
     weighted: norm(weighted, c.played),
+    outcomes: Object.fromEntries(Object.entries(outcomes).map(([k, o]) => [k, { stop: pct(o.stop, n), cut: pct(o.cut, n), none: pct(o.none, n) }])),
     unavoidable: norm(unavoidable, c.played),
   };
 }

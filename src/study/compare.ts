@@ -27,6 +27,8 @@ export interface RouteSummary {
   normalSummon: boolean;
   /** 路线里做过的动作（见 actionSig），去重。 */
   sigs: string[];
+  /** 动作签名 → 这个动作（第一次出现的那步）被无效时少掉几张重要终端。 */
+  sigLoss: Record<string, number>;
 }
 
 export interface RouteHit {
@@ -52,6 +54,13 @@ export interface HandtrapRank {
   generic: number;
   /** 动点 id → 这张手坑在这条路线上打掉的重要终端占比（路线没有重要终端时不列）。 */
   byRoute: Record<string, number>;
+  /** 动点 id → 这张手坑在这条路线上每个能打的动作，和打它会少几张重要终端。 */
+  options: Record<string, HitOption[]>;
+}
+
+export interface HitOption {
+  sig: string;
+  keyLost: number;
 }
 
 /** 多条路线里都出现的同一个动作：卡组的「轴」。 */
@@ -138,6 +147,7 @@ export function compareStudy(study: DeckStudy): StudyComparison {
         endCount: end.length,
         normalSummon: combo.steps.some((s) => s.actions.some((a) => a.type === "summon" && a.summon.method === "normal")),
         sigs: [...new Set(combo.steps.flatMap((s) => s.actions.map(actionSig)))],
+        sigLoss: {},
       },
     ];
   });
@@ -147,6 +157,7 @@ export function compareStudy(study: DeckStudy): StudyComparison {
   const draws = new Map<number, { total: number; routes: number }>();
   const effects = new Map<number, KeyEffect>();
   const axis = new Map<string, AxisAction & { lossSum: number; lossN: number }>();
+  const options = new Map<number, Record<string, HitOption[]>>();
 
   for (const r of routes) {
     // 共同动作：每条路线里每个动作只算一次；记下能打它的手坑和它被无效时的损失
@@ -165,6 +176,7 @@ export function compareStudy(study: DeckStudy): StudyComparison {
         const sig = actionSig(a);
         if (seen.has(sig)) continue;
         seen.add(sig);
+        r.sigLoss[sig] = r.keyEnd.length ? lostOf(r.keyEnd, lossIfNegated(r.combo, i)).length : 0;
         const ax = axis.get(sig) ?? { sig, card: a.type === "activate" ? a.activation.card.id : a.summon.card.id, label: actionLabel(a), routes: [], hitBy: [], keyLoss: 0, lossSum: 0, lossN: 0 };
         ax.routes.push(r.starter.id);
         for (const h of hitsBy.get(sig) ?? []) if (!ax.hitBy.includes(h)) ax.hitBy.push(h);
@@ -188,6 +200,14 @@ export function compareStudy(study: DeckStudy): StudyComparison {
         continue;
       }
       const keyLost = lostOf(r.keyEnd, e.lost);
+      const act = r.combo.steps.find((st) => st.id === e.hit.stepId)?.actions[e.hit.actionIndex];
+      if (act) {
+        const opts = (options.get(h) ?? options.set(h, {}).get(h)!)[r.starter.id] ??= [];
+        const sig = actionSig(act);
+        const o = opts.find((x) => x.sig === sig);
+        if (!o) opts.push({ sig, keyLost: keyLost.length });
+        else o.keyLost = Math.max(o.keyLost, keyLost.length);
+      }
       const prev = best.get(h);
       if (!prev || keyLost.length > prev.keyLost.length || (keyLost.length === prev.keyLost.length && e.score > prev.e.score + 1e-9)) best.set(h, { e, keyLost });
     }
@@ -198,7 +218,8 @@ export function compareStudy(study: DeckStudy): StudyComparison {
         d.routes += 1;
         continue;
       }
-      const rank = ranks.get(h) ?? { handtrap: h, score: 0, routesHurt: 0, routesHit: 0, hits: [], generic: 0, byRoute: {} };
+      const rank = ranks.get(h) ?? { handtrap: h, score: 0, routesHurt: 0, routesHit: 0, hits: [], generic: 0, byRoute: {}, options: {} };
+      rank.options = options.get(h) ?? {};
       rank.routesHit += 1;
       rank.generic += e.score;
       if (keyLost.length) rank.routesHurt += 1;

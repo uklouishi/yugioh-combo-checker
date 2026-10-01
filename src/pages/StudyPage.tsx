@@ -10,7 +10,7 @@ import { href, navigate } from "../router";
 import { compareStudy, type StudyComparison } from "../study/compare";
 import { addStarter, newStudy, removeStarter, sameStarter, sidedMain, sideProblem, starterHand, starterProblem, usesNormal, type SidePlan, type CardFilter, type DeckStudy, type Starter, type Wildcard } from "../study/model";
 import { ATTRIBUTES, RACES, blankFor, deckArchetypes, deckMatches, filterLabel, matches, practiceMain, starterLabel } from "../study/wildcard";
-import { simulateHands, type HandOptions, type HandStats } from "../study/hands";
+import { simulateHands, type HandOptions, type HandStats, type HandtrapOutcome } from "../study/hands";
 import { parseStudies, setStudyTarget, studyStore, useStudies } from "../study/store";
 import { CardView } from "../ui/CardView";
 import { downloadJson } from "../ui/download";
@@ -545,6 +545,23 @@ function PairPicker({ data, study, cards, onAdd }: { data: EngineData; study: De
   );
 }
 
+/** 一张手坑在先攻起手里的结果分布：完全断 / 缩减 / 没影响。 */
+function Outcome({ o }: { o: HandtrapOutcome }) {
+  const p = (x: number) => `${(x * 100).toFixed(1)}%`;
+  return (
+    <span className="outcome">
+      <span className="outcome-bar" aria-hidden="true">
+        <span className="stop" style={{ width: p(o.stop) }} />
+        <span className="cut" style={{ width: p(o.cut) }} />
+        <span className="none" style={{ width: p(o.none) }} />
+      </span>
+      <span className="muted">
+        完全断 {p(o.stop)} · 缩减 {p(o.cut)} · 没影响 {p(o.none)}
+      </span>
+    </span>
+  );
+}
+
 function Comparison({ data, study, cmp, hands }: { data: EngineData; study: DeckStudy; cmp: StudyComparison; hands: HandStats | null }) {
   const [open, setOpen] = useState<number | null>(null);
   // 有起手模拟时按「考虑上手和补点」的分数排
@@ -610,9 +627,11 @@ function Comparison({ data, study, cmp, hands }: { data: EngineData; study: Deck
       </div>
 
       <h3 className="sub-title">手坑优先级</h3>
-      {weighted && (
+      {weighted && hands && (
         <p className="muted">
-          按先攻随机起手加权：手里有多个已打过的动点时，按被打后损失最小的那条路线算（另一个动点能补）。百分比是平均打掉的重要终端占比，括号里是只看单条路线的平均。
+          按先攻随机 {hands.hands.toLocaleString()} 手起手算：对手挑最痛的一下打，我方挑最好的应对（沿原路线继续，或换另一个动点补点）。
+          被打的动作补点路线也要用时，补点路线也会少终端，所以打中卡组的轴更痛。百分比是平均打掉的重要终端占比，括号里是只看单条路线的平均。
+          概率按全部起手算：卡手（没有动点）{pct(1 - hands.anyStarter)}，有动点但还没打过路线 {pct(hands.anyStarter - hands.played)}，这两种手坑都不计。
         </p>
       )}
       {cmp.handtraps.length === 0 && <p className="muted">这些路线里没有能打断展开的手坑时点。</p>}
@@ -633,6 +652,7 @@ function Comparison({ data, study, cmp, hands }: { data: EngineData; study: Deck
                     {h.routesHurt} / {total} 条路线会少重要终端，{h.routesHit} 条能打
                     {worst?.keyLost.length ? ` · 最痛：${nameOf(worst.starterId)} 第 ${worst.step} 步，少 ${names(worst.keyLost)}` : ""}
                   </span>
+                  {hands?.outcomes[h.handtrap] && <Outcome o={hands.outcomes[h.handtrap]} />}
                 </span>
                 <span className="rank-score">
                   <span className="prio-bar">

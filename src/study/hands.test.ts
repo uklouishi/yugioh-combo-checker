@@ -69,6 +69,27 @@ describe("simulateHands", () => {
     expect(shared.routes).toHaveLength(2);
     expect(cmp.axis.some((a) => a.label === "通常召唤 Snake-Eye Ash")).toBe(false);
     expect(h.unavoidable[shared.sig]).toBe(1);
+    // 概率：完全断 + 缩减 + 没影响 = 有已打路线的起手
+    const o = h.outcomes[HT.ASH];
+    expect(o.stop + o.cut + o.none).toBeCloseTo(h.played, 2);
+    // Ash Blossom 打两条路线都要用的检索：补点也被打掉，几乎都是完全断
+    expect(o.stop).toBeGreaterThan(0.9 * h.played);
+  });
+
+  it("补点能躲开只在一条路线里的动作", () => {
+    let s = study();
+    s = saveRoute(s, s.starters[0].id, bare);
+    const poplar = Combo.parse({ ...bare, id: "p", starter: [{ id: POPLAR, name: "Snake-Eyes Poplar" }], steps: bare.steps.slice(2) });
+    s = saveRoute(s, s.starters[1].id, poplar);
+    const cmp = compareStudy(s);
+    // 假手坑：只能打 Ash 的通常召唤，打了 Ash 路线全没
+    const ashOnly = { ...cmp.handtraps[0], handtrap: -1, options: { [s.starters[0].id]: [{ sig: "sum:9674034:normal", keyLost: 99 }] } };
+    const h = simulateHands(s, { ...cmp, handtraps: [ashOnly] }, { ...opts, size: 5 });
+    const o = h.outcomes[-1];
+    // 手里只有 Ash 时被断；有 Poplar 时用 Poplar 补上，不受影响
+    expect(o.stop).toBeGreaterThan(0);
+    expect(o.none).toBeGreaterThan(0);
+    expect(o.none).toBeCloseTo(h.perStarter[s.starters[1].id], 1);
   });
 });
 

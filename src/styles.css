@@ -880,3 +880,8 @@ button.slot:disabled { cursor: default; }
 .side-table .delta { font-family: var(--mono); }
 .side-table .delta.up { color: #3c9a4a; }
 .side-table .delta.down { color: var(--stop); }
+.outcome { display: grid; gap: 3px; font-size: 12px; }
+.outcome-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--line); max-width: 320px; }
+.outcome-bar .stop { background: var(--stop); }
+.outcome-bar .cut { background: #d99a2b; }
+.outcome-bar .none { background: #3c9a4a; }
