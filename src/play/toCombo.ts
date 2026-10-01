@@ -18,8 +18,14 @@ const POS_DEFENSE = 0x4 | 0x8;
 type MoveEntry = Extract<TraceEntry, { kind: "move" }>;
 
 /** 引擎的位置 → combo 的区域和格子。null 表示 combo 格式里没有这个区域（衍生物等）。 */
-function zoneOf(loc: { location: number; sequence: number }): { zone: Zone; slot?: number } | null {
-  if (loc.location & OVERLAY) return null;
+/**
+ * 是不是超量素材的位置。ocgcore-wasm 会把 OVERLAY 位从 location 里去掉，改为带上 overlay_sequence，
+ * 所以 location 看起来是那只超量怪兽所在的区域（召唤过程中还在额外卡组）。
+ */
+const isOverlay = (loc: { location: number; overlay_sequence?: number }) => loc.overlay_sequence !== undefined || (loc.location & OVERLAY) !== 0;
+
+function zoneOf(loc: { location: number; sequence: number; overlay_sequence?: number }): { zone: Zone; slot?: number } | null {
+  if (isOverlay(loc)) return null;
   switch (loc.location) {
     case OcgLocation.DECK:
       return { zone: "deck" };
@@ -96,8 +102,16 @@ export function toCombo(session: DuelSession, opts: ExportOptions = {}): Combo {
   let carry: Move[] = [];
   let carryTitle: string[] = [];
 
-  session.actions.forEach((action, ai) => {
-    const entries = session.trace.filter((t) => t.action === ai);
+  // 第一个操作之前（比如回合开始时在连锁提示里发动速攻魔法）发动的卡单独算一步，不然整次发动都会丢掉
+  const early = session.trace.find((t) => t.action < 0 && t.kind === "chain" && t.controller === 0);
+  const list = [
+    ...(early?.kind === "chain" ? [{ action: { label: `发动 ${data.name(early.code)}` }, ai: -1 }] : []),
+    ...session.actions.map((action, ai) => ({ action, ai })),
+  ];
+
+  list.forEach(({ action, ai }) => {
+    // 开局抽的 5 张是起手，不算这一步的移动
+    const entries = session.trace.filter((t) => t.action === ai && !(ai < 0 && t.kind === "draw"));
     const moves: Move[] = [];
     const notes: string[] = [];
     const actions: StepAction[] = [];
@@ -140,19 +154,26 @@ export function toCombo(session: DuelSession, opts: ExportOptions = {}): Combo {
       } else if (t.kind === "move") {
         const m = t as MoveEntry;
         if (m.to.controller !== 0 && m.from.controller !== 0) continue;
-        if (m.from.location === m.to.location && !(m.from.location & OVERLAY)) continue; // 同一区域内换格子、改变表示形式
-        if (m.to.location & OVERLAY && m.from.location === OcgLocation.MZONE && m.from.controller === 0) {
-          // 超量素材：combo 格式没有素材区，记在墓地
-          const src = zoneOf(m.from)!;
-          moves.push({ card: ref(m.code), from: src.zone, to: "gy", ...(src.slot !== undefined && { fromSlot: src.slot }), ...when() });
-          notes.push(`${data.name(m.code)} 成为超量素材（场地里记在墓地）`);
+        if (isOverlay(m.to)) {
+          // 成为超量素材：combo 格式没有素材区，记在墓地（已经在墓地、或者从别的超量怪兽下面转过来的不用再记）
+          const src = zoneOf(m.from);
+          if (src && src.zone !== "gy" && m.from.controller === 0) {
+            moves.push({ card: ref(m.code), from: src.zone, to: "gy", ...(src.slot !== undefined && { fromSlot: src.slot }), ...when() });
+            notes.push(`${data.name(m.code)} 成为超量素材（场地里记在墓地）`);
+            if (src.zone === "deck") usedDeck.push(m.code);
+          }
           continue;
         }
-        if (m.from.location & OVERLAY) {
+        if (isOverlay(m.from)) {
           if (m.to.location === OcgLocation.GRAVE) continue; // 素材已经记在墓地
           const to = zoneOf(m.to);
           if (to && m.to.controller === 0) moves.push({ card: ref(m.code), from: "gy", to: to.zone, slot: to.slot, ...when() });
           continue;
+        }
+        if (m.from.location === m.to.location) {
+          // 改变表示形式、手卡/卡组/墓地内部换顺序不算移动；场上换格子（比如额外怪兽区 → 主要怪兽区）要记下来
+          const onFieldZone = m.from.location === OcgLocation.MZONE || m.from.location === OcgLocation.SZONE;
+          if (!onFieldZone || m.from.sequence === m.to.sequence) continue;
         }
         const from = zoneOf(m.from);
         const to = zoneOf(m.to);
@@ -188,7 +209,9 @@ export function toCombo(session: DuelSession, opts: ExportOptions = {}): Combo {
     }
 
     if (action.label === "结束回合" || action.label === "进入战斗阶段") {
-      if (steps.length) steps.at(-1)!.moves.push(...moves.map(untimed));
+      // 之前攒下的盖放先放进去，保持先后顺序
+      if (steps.length) steps.at(-1)!.moves.push(...carry.map(untimed), ...moves.map(untimed));
+      if (steps.length) carry = [];
       return;
     }
     if (!actions.length) {
@@ -199,7 +222,7 @@ export function toCombo(session: DuelSession, opts: ExportOptions = {}): Combo {
     }
 
     const interruptions: InterruptionNote[] = [];
-    const hitActions = ai === 0 ? [-1, 0] : [ai];
+    const hitActions = ai === 0 && !early ? [-1, 0] : [ai];
     for (const h of session.hits.filter((x) => hitActions.includes(x.action))) {
       for (const o of h.options) {
         if (!handtrapById.has(o.code) || interruptions.some((n) => n.handtrap === o.code)) continue;

@@ -2,7 +2,7 @@
  * 播放一步时的分镜：把一个 step 拆成一拍一拍（发动、召唤、每一次卡片移动），
  * 每一拍带着那一刻的局面、一句说明和正在连锁中的卡，界面按顺序播放。
  */
-import { applyMove, clone, locate, zoneName, type Board, type Loc } from "./board";
+import { applyMove, clone, locate, zoneName, type Board, type Leniency, type Loc } from "./board";
 import type { CardRef, Move, Step, StepAction, SummonMethod, Zone } from "./schema";
 
 export interface ChainMark {
@@ -72,7 +72,7 @@ export function describeSummon(s: Extract<StepAction, { type: "summon" }>["summo
 }
 
 /** 从 before 局面开始，把 step 拆成一拍一拍。最后一拍的局面等于这一步之后的局面。 */
-export function buildBeats(step: Step, before: Board): Beat[] {
+export function buildBeats(step: Step, before: Board, lenient?: Leniency): Beat[] {
   const board = clone(before);
   const beats: Beat[] = [];
   let chain: ChainMark[] = [];
@@ -103,7 +103,7 @@ export function buildBeats(step: Step, before: Board): Beat[] {
       // 处理到这一环时，后面的环已经处理完了
       chain = chain.filter((c) => c.link <= m.resolving!);
     }
-    const { from, to } = applyMove(board, m);
+    const { from, to } = applyMove(board, m, lenient);
     for (const c of chain) {
       if (c.card.id === m.card.id && c.loc?.zone === from.zone && c.loc.index === from.index) c.loc = to;
     }
