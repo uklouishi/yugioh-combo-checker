@@ -39,6 +39,13 @@ export const Starter = z.object({
 });
 export type Starter = z.infer<typeof Starter>;
 
+/** 一套换 side：换出主卡组的卡、换入 side 的卡（同名卡换几张就列几次）。 */
+export const SidePlan = z.object({
+  out: z.array(CardId).default([]),
+  in: z.array(CardId).default([]),
+});
+export type SidePlan = z.infer<typeof SidePlan>;
+
 export const DeckStudy = z.object({
   id: z.string(),
   name: z.string(),
@@ -50,6 +57,18 @@ export const DeckStudy = z.object({
   starters: z.array(Starter).default([]),
   /** 玩家选的重要终端（阻抗怪等）。 */
   keyCards: z.array(CardId).default([]),
+  /** 废件：先后攻都不想抽到的卡，只用来算废件上手率。 */
+  bricks: z.array(CardId).default([]),
+  /** side 卡组。 */
+  side: z.array(CardId).default([]),
+  /** 卡组里（含 side）哪些是手坑。没设置过时按网站的手坑表推荐。 */
+  handtraps: z.array(CardId).optional(),
+  /** 解牌（后攻破场的卡：Super Polymerization、Lava Golem…）。 */
+  breakers: z.array(CardId).default([]),
+  /** 玩家确认过手坑和解牌已经标好，换 side 分析才能用。 */
+  rolesConfirmed: z.boolean().default(false),
+  /** 先攻、后攻各一套换 side。 */
+  sidePlans: z.object({ first: SidePlan, second: SidePlan }).default({ first: { out: [], in: [] }, second: { out: [], in: [] } }),
   /** 动点 id → 打出来的路线。 */
   routes: z.record(z.string(), Combo).default({}),
   updatedAt: z.string(),
@@ -84,7 +103,7 @@ const sameFilter = (a?: CardFilter, b?: CardFilter) =>
 export const sameStarter = (a: Pick<Starter, "cards" | "wildcard">, b: Pick<Starter, "cards" | "wildcard">) =>
   sameHand(a.cards, b.cards) && !!a.wildcard === !!b.wildcard && sameFilter(a.wildcard?.filter, b.wildcard?.filter);
 
-export function newStudy(name: string, main: number[], extra: number[], format: "tcg" | "ocg", now = new Date()): DeckStudy {
+export function newStudy(name: string, main: number[], extra: number[], format: "tcg" | "ocg", now = new Date(), side: number[] = []): DeckStudy {
   return {
     id: `study-${now.getTime().toString(36)}`,
     name,
@@ -94,6 +113,11 @@ export function newStudy(name: string, main: number[], extra: number[], format: 
     normalSummon: {},
     starters: [],
     keyCards: [],
+    bricks: [],
+    side,
+    breakers: [],
+    rolesConfirmed: false,
+    sidePlans: { first: { out: [], in: [] }, second: { out: [], in: [] } },
     routes: {},
     updatedAt: now.toISOString().slice(0, 10),
   };
@@ -123,4 +147,24 @@ export function saveRoute(study: DeckStudy, starterId: string, combo: Combo): De
     normalSummon[String(starter.cards[0])] = ns;
   }
   return { ...study, normalSummon, routes: { ...study.routes, [starterId]: combo } };
+}
+
+/** 换 side 后的主卡组：换出的卡按张数去掉，换入的加上。 */
+export function sidedMain(main: number[], plan: SidePlan): number[] {
+  const out = [...main];
+  for (const c of plan.out) {
+    const i = out.indexOf(c);
+    if (i >= 0) out.splice(i, 1);
+  }
+  return [...out, ...plan.in];
+}
+
+/** 换 side 的问题：换出比主卡组多、换入比 side 多、换完不在 40–60 张。没问题返回 null。 */
+export function sideProblem(study: DeckStudy, plan: SidePlan): string | null {
+  const count = (ids: number[], id: number) => ids.filter((x) => x === id).length;
+  for (const id of new Set(plan.out)) if (count(plan.out, id) > count(study.main, id)) return "换出的张数比主卡组里的多";
+  for (const id of new Set(plan.in)) if (count(plan.in, id) > count(study.side, id)) return "换入的张数比 side 里的多";
+  const n = study.main.length - plan.out.length + plan.in.length;
+  if (n < 40 || n > 60) return `换完主卡组是 ${n} 张，要在 40–60 张之间`;
+  return null;
 }
