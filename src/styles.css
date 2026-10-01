@@ -860,3 +860,8 @@ button.slot:disabled { cursor: default; }
   .rank-row { grid-template-columns: 22px 30px minmax(0, 1fr); }
   .rank-score { grid-column: 3; justify-items: start; grid-template-columns: auto auto; align-items: center; gap: 8px; }
 }
+.starter-list .thumb.any .any-tag {
+  position: absolute; inset: auto 0 0 0; text-align: center; font: 700 10px var(--body);
+  background: var(--accent); color: #fff; border-radius: 0 0 3px 3px;
+}
+.wildcard { display: grid; gap: 8px; padding: 10px; border: 1px dashed var(--line); border-radius: 8px; }

@@ -6,6 +6,7 @@
  * - base.json：CardScripts 根目录的公共脚本（constant.lua、utility.lua、proc_*.lua…）
  * - scripts/c<id>.lua：每张卡的效果脚本（official，缺的用 pre-release 补）
  * - strings.json：EDOPro 的系统提示文字（Select the card(s) to add to your hand…）
+ * - setnames.json：字段代码 → 字段名（Dark Magician、Snake-Eye…）
  * - banlists.json：TCG / OCG 禁卡表（ProjectIgnis LFLists）
  *
  * 数据和脚本来自 ProjectIgnis，AGPL-3.0。下载缓存在 .cache/engine/，加 --refresh 重新下载。
@@ -113,13 +114,17 @@ for (const sub of ["official", "pre-release"]) {
   }
 }
 
-// strings.json：只要 !system
+// strings.json：只要 !system；setnames.json：字段代码 → 字段名（!setname）
 const sys: Record<number, string> = {};
+const setnames: Record<number, string> = {};
 for (const line of readFileSync(stringsFile, "utf8").split(/\r?\n/)) {
   const m = line.match(/^!system (\d+) (.*)$/);
   if (m) sys[Number(m[1])] = m[2];
+  const n = line.match(/^!setname 0x([0-9a-f]+) ([^\t]+)/i);
+  if (n) setnames[parseInt(n[1], 16)] = n[2].trim();
 }
 writeFileSync(join(OUT, "strings.json"), JSON.stringify(sys));
+writeFileSync(join(OUT, "setnames.json"), JSON.stringify(setnames));
 
 // banlists.json：{ tcg: { name, cards: { 卡号: 0 禁止 / 1 限制 / 2 准限制 } }, ocg: … }
 interface Banlist {

@@ -80,16 +80,18 @@ export class EngineData {
     readonly sys: Record<string, string>,
     private readonly fetcher: Fetcher,
     readonly banlists: Partial<Record<Format, Banlist>> = {},
+    /** 字段代码 → 字段名。 */
+    readonly setnames: Record<string, string> = {},
   ) {
     for (const r of rows) this.cards.set(r[0], toCard(r));
   }
 
   static async load(fetcher: Fetcher): Promise<EngineData> {
-    const [cards, base, sys, banlists] = await Promise.all(
-      ["cards.json", "base.json", "strings.json", "banlists.json"].map((f) => fetcher(f).catch(() => null)),
+    const [cards, base, sys, banlists, setnames] = await Promise.all(
+      ["cards.json", "base.json", "strings.json", "banlists.json", "setnames.json"].map((f) => fetcher(f).catch(() => null)),
     );
     if (!cards || !base || !sys) throw new Error("引擎数据加载失败");
-    return new EngineData(JSON.parse(cards).cards, JSON.parse(base), JSON.parse(sys), fetcher, banlists ? JSON.parse(banlists) : {});
+    return new EngineData(JSON.parse(cards).cards, JSON.parse(base), JSON.parse(sys), fetcher, banlists ? JSON.parse(banlists) : {}, setnames ? JSON.parse(setnames) : {});
   }
 
   /** 这个禁卡表下最多能放几张（异画按本体算）。 */
