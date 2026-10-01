@@ -250,7 +250,7 @@ export async function probe(ctx: ProbeContext, task: ProbeTask): Promise<Recover
     await ctx.pause?.();
     const t = await open(core, data, setup, responses);
     const ok = autoAnswer(t);
-    const reached = t.field()[0].monsters.find((c) => c && waypoints.has(c.code) && !before.has(c.code));
+    const reached = t.field()[0].monsters.find((c) => c && c.code !== task.card && waypoints.has(c.code) && !before.has(c.code));
     const usedCard = t.actions.slice(startActions).some((a) => a.code === task.card);
     if (reached && usedCard) {
       found = { ...task, reached: reached.code, line: t.actions.slice(startActions).map((a) => a.label) };
@@ -279,7 +279,7 @@ export async function probe(ctx: ProbeContext, task: ProbeTask): Promise<Recover
 }
 
 /**
- * 要试哪些情况：每条打出了重要终端的路线，每个手坑最痛的那一下（同一个动作只试一次，用排名最高的手坑），
+ * 要试哪些情况：每条打出了重要终端的路线，每个会让重要终端变少的吃坑点（同一个动作只试一次，用排名最高的手坑），
  * 手里另有卡组里的哪张卡（不含手坑、这个动点自己的卡）。
  */
 export function probeTasks(study: DeckStudy, cmp: StudyComparison, isHandtrap: (id: number) => boolean): ProbeTask[] {
@@ -287,11 +287,10 @@ export function probeTasks(study: DeckStudy, cmp: StudyComparison, isHandtrap: (
   const cards = [...new Set(study.main)].filter((c) => !isHandtrap(c));
   for (const r of cmp.routes) {
     if (!r.keyEnd.length) continue;
+    // 每个能让重要终端变少的动作都要试：对手会挑没被续上的那一下打
     const sigs = new Map<string, number>();
     for (const h of cmp.handtraps) {
-      const opts = h.options[r.starter.id] ?? [];
-      const worst = opts.reduce<(typeof opts)[number] | null>((a, o) => (!a || o.keyLost > a.keyLost ? o : a), null);
-      if (worst && worst.keyLost > 0 && !worst.sig.startsWith("sum:") && !sigs.has(worst.sig)) sigs.set(worst.sig, h.handtrap);
+      for (const o of h.options[r.starter.id] ?? []) if (o.keyLost > 0 && !o.sig.startsWith("sum:") && !sigs.has(o.sig)) sigs.set(o.sig, h.handtrap);
     }
     for (const [sig, handtrap] of sigs) {
       for (const card of cards) if (!r.starter.cards.includes(card)) tasks.push({ starterId: r.starter.id, sig, handtrap, card });
@@ -300,15 +299,16 @@ export function probeTasks(study: DeckStudy, cmp: StudyComparison, isHandtrap: (
   return tasks;
 }
 
-/** 续出来就算续上的卡：路线里会让重要终端出不来的额外怪兽召唤，加上重要终端本身。 */
-export function waypointsOf(study: DeckStudy, cmp: StudyComparison): Set<number> {
-  const extra = new Set(study.extra);
+/**
+ * 续出来就算续上的卡：路线里会让重要终端出不来的融合、同调、超量、连接、仪式召唤的怪兽，加上重要终端本身。
+ * （效果特召不算：很多卡能特召自己，算进来就分不出有没有真的续上。）
+ */
+export function waypointsOf(cmp: StudyComparison): Set<number> {
   const out = new Set<number>();
   for (const r of cmp.routes) {
     for (const k of r.keyEnd) out.add(k);
     for (const [sig, lost] of Object.entries(r.sigLoss)) {
-      const card = sigCard(sig);
-      if (sig.startsWith("sum:") && lost > 0 && extra.has(card)) out.add(card);
+      if (lost > 0 && /^sum:\d+:(fusion|synchro|xyz|link|ritual)$/.test(sig)) out.add(sigCard(sig));
     }
   }
   return out;

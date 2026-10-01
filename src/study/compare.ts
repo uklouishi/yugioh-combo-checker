@@ -125,7 +125,7 @@ export function actionSig(a: StepAction): string {
   return `sum:${a.summon.card.id}:${a.summon.method}`;
 }
 
-function actionLabel(a: StepAction): string {
+export function actionLabel(a: StepAction): string {
   if (a.type !== "activate") return `${METHOD_LABEL[a.summon.method]} ${a.summon.card.name}`;
   const what = a.activation.effects.length ? a.activation.effects.map((t) => EFFECT_LABEL[t]).join("、") : KIND_LABEL[a.activation.kind];
   return `${a.activation.card.name}：${what}`;

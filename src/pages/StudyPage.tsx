@@ -15,6 +15,7 @@ import { parseStudies, setStudyTarget, studyStore, useStudies } from "../study/s
 import { CardView } from "../ui/CardView";
 import { downloadJson } from "../ui/download";
 import { NotFound } from "./NotFound";
+import { StudyRecovery } from "./StudyRecovery";
 
 const FORMAT_LABEL: Record<Format, string> = { tcg: "TCG", ocg: "OCG" };
 
@@ -402,6 +403,7 @@ function StudyDetail({ data, study }: { data: EngineData; study: DeckStudy }) {
       </section>
 
       <Comparison data={data} study={study} cmp={cmp} hands={first} />
+      <StudyRecovery data={data} study={study} cmp={cmp} isHandtrap={handOpts.isHandtrap} onChange={update} />
       <Roles data={data} study={study} handtraps={htSet} onChange={update} />
       <Rates data={data} study={study} first={first} second={second} onToggleBrick={toggleBrick} label={label} />
       <SideSim data={data} study={study} cmp={cmp} base={{ first, second }} handOpts={handOpts} onChange={update} label={label} />

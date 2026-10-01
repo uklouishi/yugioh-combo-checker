@@ -4,6 +4,7 @@ import { HT } from "../model/interruptions";
 import { Combo } from "../model/schema";
 import { compareStudy } from "./compare";
 import { simulateHands } from "./hands";
+import { probeTasks, waypointsOf } from "./probe";
 import { addStarter, newStudy, saveRoute, sidedMain, sideProblem, type DeckStudy } from "./model";
 
 const snakeEye = Combo.parse(JSON.parse(readFileSync(new URL("../data/combos/snake-eye-ash-1card.json", import.meta.url), "utf8")));
@@ -93,6 +94,26 @@ describe("simulateHands", () => {
   });
 });
 
+describe("引擎试出来的续打", () => {
+  it("确认过的续打：手里另有那张卡就算续上，没确认的不算", () => {
+    let s = study();
+    s = saveRoute(s, s.starters[0].id, bare);
+    const cmp = compareStudy(s);
+    const ash = cmp.handtraps.find((x) => x.handtrap === HT.ASH)!;
+    // 对手会挑没被续上的那一下打：每个能打的动作都要有续打才算躲开
+    const recs = ash.options[s.starters[0].id].map((o) => ({ starterId: s.starters[0].id, sig: o.sig, handtrap: HT.ASH, card: ASH_BLOSSOM, reached: PROMETHEAN, line: ["发动 x"] }));
+    const before = simulateHands(s, cmp, { ...opts, size: 5 }).outcomes[HT.ASH];
+    const pending = simulateHands({ ...s, recoveries: recs }, cmp, { ...opts, size: 5 }).outcomes[HT.ASH];
+    const partial = simulateHands({ ...s, recoveries: [{ ...recs[0], ok: true }] }, cmp, { ...opts, size: 5 }).outcomes[HT.ASH];
+    const after = simulateHands({ ...s, recoveries: recs.map((r) => ({ ...r, ok: true })) }, cmp, { ...opts, size: 5 }).outcomes[HT.ASH];
+    expect(pending).toEqual(before);
+    expect(recs.length).toBeGreaterThan(1);
+    expect(partial).toEqual(before);
+    expect(after.none).toBeGreaterThan(before.none);
+    expect(after.stop).toBeLessThan(before.stop);
+  });
+});
+
 describe("解牌和换 side", () => {
   const SUPER_POLY = 48130397;
   const LAVA = 102380;
@@ -127,5 +148,20 @@ describe("解牌和换 side", () => {
     expect(sideProblem(s, { out: [ASH, ASH, ASH, ASH], in: [] })).toMatch("主卡组");
     expect(sideProblem(s, { out: [ASH], in: [] })).toMatch("40");
     expect(sideProblem(s, { out: [ASH], in: [SUPER_POLY] })).toBeNull();
+  });
+});
+
+describe("引擎试续打要试哪些情况", () => {
+  it("每条有重要终端的路线、每个会少重要终端的吃坑点、卡组里除手坑和动点外的每张卡", () => {
+    let s = study();
+    s = saveRoute(s, s.starters[0].id, bare);
+    const cmp = compareStudy(s);
+    const tasks = probeTasks(s, cmp, (id) => id === ASH_BLOSSOM);
+    expect(tasks.length).toBeGreaterThan(0);
+    expect(tasks.every((t) => t.starterId === s.starters[0].id && t.card !== ASH && t.card !== ASH_BLOSSOM && !t.sig.startsWith("sum:"))).toBe(true);
+    // 关键怪兽：重要终端，加上路线里的额外怪兽召唤
+    const wp = waypointsOf(cmp);
+    expect(wp.has(PROMETHEAN)).toBe(true);
+    expect(wp.has(ASH)).toBe(false);
   });
 });
