@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import handtrapsJson from "../data/handtraps.json";
 import { deriveInterruptions, HT } from "./interruptions";
+import { evaluateHits } from "./priority";
 import { Combo, Handtrap } from "./schema";
 import { checkCombos } from "./validate";
 
@@ -29,6 +30,22 @@ describe("deriveInterruptions", () => {
 
   it('Maxx "C" 标在第一次特召', () => {
     expect(deriveInterruptions(snakeEye).find((i) => i.handtrap === HT.MAXX_C)?.stepId).toBe("s3");
+  });
+
+  it("Mulcharmy 按各自的抽卡条件标在第一次符合条件的召唤", () => {
+    const hits = deriveInterruptions(snakeEye);
+    const stepOf = (h: number) => hits.find((i) => i.handtrap === h)?.stepId;
+    expect(stepOf(HT.PURULIA)).toBe("s1"); // 从手卡通常召唤 Snake-Eye Ash
+    expect(stepOf(HT.FUWALOS)).toBe("s5"); // 从卡组特召 Snake-Eye Oak
+    expect(stepOf(HT.MEOWLS)).toBe("s6"); // 从墓地特召 Snake-Eyes Poplar
+  });
+
+  it("Mulcharmy 之后让对手抽的张数只算符合条件的召唤", () => {
+    const draws = new Map(evaluateHits(snakeEye).filter((e) => e.draws !== undefined).map((e) => [e.hit.handtrap, e.draws]));
+    expect(draws.get(HT.MAXX_C)).toBe(6);
+    expect(draws.get(HT.PURULIA)).toBe(2); // Ash 通常召唤、Poplar 从手卡特召
+    expect(draws.get(HT.FUWALOS)).toBe(3); // Oak、Promethean Princess、Flamberge
+    expect(draws.get(HT.MEOWLS)).toBe(2); // Poplar、Oak 从墓地
   });
 
   it("Nibiru标在第 5 次召唤", () => {

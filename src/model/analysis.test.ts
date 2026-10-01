@@ -27,6 +27,9 @@ describe("analyzeCombo", () => {
   });
 
   it("没有手坑能打的步骤为 null", () => {
-    expect(a.stepWorst[0]).toBeNull();
+    // 第 1 步通常召唤 Snake-Eye Ash 会被 Mulcharmy Purulia 标上，去掉这一步的动作再看
+    const b = analyzeCombo({ ...snakeEye, steps: snakeEye.steps.map((s, i) => (i === 0 ? { ...s, actions: [] } : s)) });
+    expect(b.stepWorst[0]).toBeNull();
+    expect(a.stepWorst[0]?.handtrap).toBe(HT.PURULIA);
   });
 });

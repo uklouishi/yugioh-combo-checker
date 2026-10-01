@@ -12,12 +12,12 @@
  * 作者在 combo 里写了影响（直接断 / 终场变弱…）时以作者为准。
  */
 import { analyzeCombo } from "./analysis";
-import { HT, type Interruption } from "./interruptions";
+import { drawsFor, HT, type Interruption } from "./interruptions";
 import type { Combo, InterruptionImpact, Step, Zone } from "./schema";
 
-export const FUWALOS = 42141493;
-export const PURULIA = 84192580;
-export const MEOWLS = 87126721;
+export const FUWALOS = HT.FUWALOS;
+export const PURULIA = HT.PURULIA;
+export const MEOWLS = HT.MEOWLS;
 export const HARMONIA = 70088809;
 
 export interface HandtrapPriority {
@@ -117,16 +117,14 @@ function monstersAfter(combo: Combo, idx: number): number[] {
   return [...on].filter(([, n]) => n > 0).map(([id]) => id);
 }
 
-function drawsAfter(handtrap: number, io: StepIO[], from: number): number {
+/** 从第 from 步的第 actionIndex 个动作起，之后符合这张手坑抽卡条件的召唤次数。 */
+function drawsAfter(handtrap: number, combo: Combo, from: number, actionIndex: number): number {
   let n = 0;
-  for (let j = from; j < io.length; j++) {
-    for (const s of io[j].summons) {
-      if (handtrap === FUWALOS) n += Number(s.special && (s.from === "deck" || s.from === "extra"));
-      else if (handtrap === PURULIA) n += Number(s.from === "hand");
-      else if (handtrap === MEOWLS) n += Number(s.special && (s.from === "gy" || s.from === "banished"));
-      else n += Number(s.special);
-    }
-  }
+  combo.steps.slice(from).forEach((step, k) =>
+    step.actions.forEach((a, ai) => {
+      if ((k > 0 || ai >= actionIndex) && drawsFor(handtrap, a)) n += 1;
+    }),
+  );
   return n;
 }
 
@@ -169,7 +167,7 @@ function evaluate(combo: Combo, io: StepIO[], hit: Interruption): Eval {
   };
 
   if (h === HT.MAXX_C || h === FUWALOS || h === PURULIA || h === MEOWLS) {
-    const draws = drawsAfter(h, io, i);
+    const draws = drawsAfter(h, combo, i, hit.actionIndex);
     const score = Math.min(1, draws / DRAW_CAP) * 0.85;
     const reason = draws ? `第 ${i + 1} 步丢出后，这条路线之后还会让对手抽约 ${draws} 张（不打断展开，但对手资源变多）` : `第 ${i + 1} 步之后没有会让对手抽卡的召唤，基本没用`;
     return { score, draws, lostSteps: 0, endLost: 0, lost: new Set(), reason };
