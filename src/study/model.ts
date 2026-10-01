@@ -71,6 +71,19 @@ export type KeyPriority = z.infer<typeof KeyPriority>;
 export const KeyTarget = z.object({ zone: KeyZone.default("field"), priority: KeyPriority.default(1) });
 export type KeyTarget = z.infer<typeof KeyTarget>;
 
+/** 快捷模式（电脑自己打）生成的路线的附加信息。 */
+export const AutoRoute = z.object({
+  /** 结束回合之前有几条回应：「在练习里改」从这里接着打。 */
+  openAt: z.number().int().nonnegative(),
+  /** 引擎没打出来的重要终端。 */
+  missing: z.array(CardId).default([]),
+  /** 玩家确认这一手本来就出不来的重要终端（不再提问）。 */
+  skipped: z.array(CardId).default([]),
+  /** 时间用完时还没搜完。 */
+  timedOut: z.boolean().default(false),
+});
+export type AutoRoute = z.infer<typeof AutoRoute>;
+
 export const DeckStudy = z.object({
   id: z.string(),
   name: z.string(),
@@ -102,6 +115,8 @@ export const DeckStudy = z.object({
   replays: z.record(z.string(), z.string()).default({}),
   /** 引擎试出来的「被打后靠这张卡续上」，玩家确认过的才算进手坑优先级。 */
   recoveries: z.array(Recovery).default([]),
+  /** 动点 id → 这条路线是电脑生成的（玩家自己保存后去掉）。 */
+  auto: z.record(z.string(), AutoRoute).default({}),
   updatedAt: z.string(),
 });
 export type DeckStudy = z.infer<typeof DeckStudy>;
@@ -153,6 +168,7 @@ export function newStudy(name: string, main: number[], extra: number[], format: 
     routes: {},
     replays: {},
     recoveries: [],
+    auto: {},
     updatedAt: now.toISOString().slice(0, 10),
   };
 }
@@ -166,14 +182,15 @@ export function addStarter(study: DeckStudy, cards: number[], now = new Date(), 
 export function removeStarter(study: DeckStudy, id: string): DeckStudy {
   const { [id]: _gone, ...routes } = study.routes;
   const { [id]: _replay, ...replays } = study.replays;
-  return { ...study, starters: study.starters.filter((s) => s.id !== id), routes, replays, recoveries: study.recoveries.filter((r) => r.starterId !== id) };
+  const { [id]: _auto, ...auto } = study.auto;
+  return { ...study, starters: study.starters.filter((s) => s.id !== id), routes, replays, auto, recoveries: study.recoveries.filter((r) => r.starterId !== id) };
 }
 
 /**
  * 存一条路线。单卡动顺便按路线里实际有没有通常召唤更新这张卡的通召标记
  * （引擎打出来的才是准的，两卡动分不清是哪一张召唤的，不改）。
  */
-export function saveRoute(study: DeckStudy, starterId: string, combo: Combo, replay?: string): DeckStudy {
+export function saveRoute(study: DeckStudy, starterId: string, combo: Combo, replay?: string, autoInfo?: AutoRoute): DeckStudy {
   const starter = study.starters.find((s) => s.id === starterId);
   if (!starter) return study;
   const normalSummon = { ...study.normalSummon };
@@ -186,7 +203,11 @@ export function saveRoute(study: DeckStudy, starterId: string, combo: Combo, rep
   if (replay) replays[starterId] = replay;
   else delete replays[starterId];
   const recoveries = study.recoveries.filter((r) => r.starterId !== starterId);
-  return { ...study, normalSummon, routes: { ...study.routes, [starterId]: combo }, replays, recoveries };
+  // 玩家自己打的路线不再算电脑生成
+  const auto = { ...study.auto };
+  if (autoInfo) auto[starterId] = autoInfo;
+  else delete auto[starterId];
+  return { ...study, normalSummon, routes: { ...study.routes, [starterId]: combo }, replays, recoveries, auto };
 }
 
 /** 换 side 后的主卡组：换出的卡按张数去掉，换入的加上。 */

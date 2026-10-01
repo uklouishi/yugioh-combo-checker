@@ -18,8 +18,8 @@ function remember(s: Pick<DuelSession, "setup" | "responses"> | null) {
   }
 }
 
-/** 让练习页打开时直接用这个设置开局（卡组研究页用）。 */
-export const queueDuel = (setup: DuelSetup) => remember({ setup, responses: [] });
+/** 让练习页打开时直接用这个设置开局，可以带上已经打过的回应（卡组研究页用）。 */
+export const queueDuel = (setup: DuelSetup, responses: OcgResponse[] = []) => remember({ setup, responses });
 
 /** 读出上次的对局（没有则为 null）。 */
 export function savedDuel(): { setup: DuelSetup; responses: OcgResponse[] } | null {

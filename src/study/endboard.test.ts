@@ -66,3 +66,13 @@ describe("终场条件", () => {
     expect(r.keyShown.length * 3).toBe(r.keyEnd.length);
   });
 });
+
+describe("电脑生成的路线", () => {
+  it("玩家自己保存后不再算电脑生成，删动点时一起删", () => {
+    const s0 = study();
+    const id = s0.starters[0].id;
+    const auto = saveRoute(s0, id, snakeEye, "{}", { openAt: 10, missing: [PROMETHEAN], skipped: [], timedOut: false });
+    expect(auto.auto[id]?.missing).toEqual([PROMETHEAN]);
+    expect(saveRoute(auto, id, snakeEye, "{}").auto[id]).toBeUndefined();
+  });
+});
