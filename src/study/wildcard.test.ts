@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { EngineData } from "../engine/data";
 import { startDuel } from "../engine/run";
 import { addStarter, newStudy, starterHand } from "./model";
-import { blankFor, deckMatches, filterLabel, practiceMain, starterLabel } from "./wildcard";
+import { blankFor, deckArchetypes, deckMatches, filterLabel, practiceMain, starterLabel } from "./wildcard";
 
 // 需要先运行 npm run sync-engine 生成 public/engine/
 const fetcher = (path: string) => readFile(`public/engine/${path}`, "utf8").catch(() => null);
@@ -14,6 +14,11 @@ const VEILER = 97268402; // Effect Veiler（1 星光属性魔法师族）
 const ASH_BLOSSOM = 14558127; // 炎族
 const DARK_MAGICIAN = 46986414;
 const SPELLCASTER = 0x2;
+const DMG = 38033120; // Dark Magician Girl（字段 0x30a2，属于 Dark Magician 0x10a2）
+const SE_ASH = 9674034; // Snake-Eye Ash
+const SPOILS = 89023486; // Original Sinful Spoils - Snake-Eye（魔法，字段 Snake-Eye）
+const DARK_MAGICIAN_SET = 0x10a2;
+const SNAKE_EYE_SET = 0x205;
 
 let data: EngineData;
 beforeAll(async () => {
@@ -63,5 +68,26 @@ describe("通配卡", () => {
     const duel = await startDuel(core, data, { main, extra: [], hand: starterHand(starter), opponentHand: [], format: "tcg", seed: 1 });
     const [me] = duel.field();
     expect(me.hand.map((c) => c.code).sort()).toEqual([REGULUS, DARK_MAGICIAN].sort());
+  });
+
+  it("自动列出卡组里的字段，子字段也算进母字段", () => {
+    const main = [DARK_MAGICIAN, DMG, DMG, SE_ASH, SPOILS, ...Array(35).fill(ASH_BLOSSOM)];
+    const sets = deckArchetypes(data, main);
+    expect(sets.find((a) => a.setcode === DARK_MAGICIAN_SET)).toMatchObject({ name: "Dark Magician", cards: 3 });
+    expect(sets.find((a) => a.setcode === SNAKE_EYE_SET)).toMatchObject({ name: "Snake-Eye", cards: 2 });
+  });
+
+  it("按字段筛选：只选字段时魔法也算，加了种族就只要怪兽", () => {
+    const s = newStudy("x", [DARK_MAGICIAN, DMG, SE_ASH, SPOILS, ...Array(36).fill(ASH_BLOSSOM)], [], "tcg");
+    expect(deckMatches(data, s, { setcode: DARK_MAGICIAN_SET })).toEqual([DARK_MAGICIAN, DMG]);
+    expect(deckMatches(data, s, { setcode: SNAKE_EYE_SET })).toEqual([SE_ASH, SPOILS]);
+    expect(deckMatches(data, s, { setcode: SNAKE_EYE_SET, race: 0x80 })).toEqual([SE_ASH]);
+    expect(filterLabel({ setcode: SNAKE_EYE_SET, setname: "Snake-Eye" })).toBe("任意「Snake-Eye」卡");
+    expect(filterLabel({ setcode: DARK_MAGICIAN_SET, setname: "Dark Magician", race: SPELLCASTER })).toBe("任意「Dark Magician」魔法师族怪兽");
+  });
+
+  it("字段里有通常怪兽时用它当白板，没有时找不到白板", () => {
+    expect(blankFor(data, { setcode: DARK_MAGICIAN_SET })).toBe(DARK_MAGICIAN);
+    expect(blankFor(data, { setcode: SNAKE_EYE_SET })).toBeNull();
   });
 });

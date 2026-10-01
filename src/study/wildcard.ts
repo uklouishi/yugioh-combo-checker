@@ -48,17 +48,26 @@ export const ATTRIBUTES: [number, string][] = [
 const raceName = new Map(RACES);
 const attrName = new Map(ATTRIBUTES);
 
-/** 比如「任意 4 星以下暗属性魔法师族怪兽」。 */
+/** 只按字段（没有种族、属性、等级）时魔法、陷阱也算。 */
+const monstersOnly = (f: CardFilter) => !f.setcode || !!(f.race || f.attribute || f.maxLevel);
+
+/** 比如「任意 4 星以下暗属性魔法师族怪兽」「任意「Dark Magician」卡」。 */
 export function filterLabel(f: CardFilter): string {
+  const set = f.setcode ? `「${f.setname ?? `0x${f.setcode.toString(16)}`}」` : "";
   const level = f.maxLevel ? ` ${f.maxLevel} 星以下的` : "";
   const attr = f.attribute ? `${attrName.get(f.attribute) ?? "?"}属性` : "";
   const race = f.race ? (raceName.get(f.race) ?? "?") : "";
-  return `任意${level}${attr}${race}怪兽`;
+  return `任意${set}${level}${attr}${race}${monstersOnly(f) ? "怪兽" : "卡"}`;
 }
 
-/** 主卡组的怪兽是否符合条件（额外卡组的怪兽不会在手里）。 */
+/** 字段判断，规则同 ygopro 的 IsSetCard（子字段也算，比如 Dark Magician 0x10a2 属于 0xa2）。 */
+export const inSet = (c: EngineCard, set: number) => c.data.setcodes.some((s) => (s & 0xfff) === (set & 0xfff) && (s & set) === set);
+
+/** 主卡组的卡是否符合条件（额外卡组的怪兽不会在手里）。 */
 export function matches(c: EngineCard, f: CardFilter): boolean {
-  if (!(c.type & TYPE.MONSTER) || c.type & TYPE.TOKEN) return false;
+  if (c.type & TYPE.TOKEN) return false;
+  if (monstersOnly(f) && !(c.type & TYPE.MONSTER)) return false;
+  if (f.setcode && !inSet(c, f.setcode)) return false;
   if (f.race && (c.data.race & BigInt(f.race)) === 0n) return false;
   if (f.attribute && (c.data.attribute & f.attribute) === 0) return false;
   if (f.maxLevel && (c.data.level === 0 || c.data.level > f.maxLevel)) return false;
@@ -70,11 +79,31 @@ export function deckMatches(data: EngineData, study: DeckStudy, f: CardFilter, e
   return [...new Set(study.main)].filter((id) => !exclude.includes(id) && matches(data.cards.get(id)!, f));
 }
 
+/** 卡组里出现的字段（按卡组里张数从多到少），给「任意某字段的卡」用。 */
+export function deckArchetypes(data: EngineData, main: number[]): { setcode: number; name: string; cards: number }[] {
+  // 低 12 位相同的有名字的字段：Dark Magician Girl（0x30a2）同时属于 Dark Magician（0x10a2）和 Magician（0xa2）
+  const named = new Map<number, number[]>();
+  for (const k of Object.keys(data.setnames)) {
+    const set = Number(k);
+    named.set(set & 0xfff, [...(named.get(set & 0xfff) ?? []), set]);
+  }
+  const out = new Map<number, number>();
+  for (const id of main) {
+    const sets = new Set<number>();
+    for (const s of data.cards.get(id)?.data.setcodes ?? []) for (const t of named.get(s & 0xfff) ?? []) if ((s & t) === t) sets.add(t);
+    for (const set of sets) out.set(set, (out.get(set) ?? 0) + 1);
+  }
+  return [...out]
+    .map(([setcode, cards]) => ({ setcode, name: data.setnames[setcode], cards }))
+    .sort((a, b) => b.cards - a.cards || a.name.localeCompare(b.name));
+}
+
 /**
  * 练习用的代表卡：符合条件的通常怪兽（没有效果，只提供种族、属性、等级），
  * 这样打出来的就是「随便哪一张都行」的路线。找不到白板时返回 null。
  */
 export function blankFor(data: EngineData, f: CardFilter): number | null {
+  // 字段卡大多有自己的效果，白板很少；只有字段里有通常怪兽时才用
   const dm = data.cards.get(DARK_MAGICIAN);
   if (dm && matches(dm, f)) return DARK_MAGICIAN;
   let best: EngineCard | null = null;

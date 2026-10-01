@@ -9,7 +9,7 @@ import { queueDuel } from "../play/useDuel";
 import { href, navigate } from "../router";
 import { compareStudy, type StudyComparison } from "../study/compare";
 import { addStarter, newStudy, removeStarter, sameStarter, starterHand, starterProblem, usesNormal, type CardFilter, type DeckStudy, type Starter, type Wildcard } from "../study/model";
-import { ATTRIBUTES, RACES, blankFor, deckMatches, filterLabel, matches, practiceMain, starterLabel } from "../study/wildcard";
+import { ATTRIBUTES, RACES, blankFor, deckArchetypes, deckMatches, filterLabel, matches, practiceMain, starterLabel } from "../study/wildcard";
 import { parseStudies, setStudyTarget, studyStore, useStudies } from "../study/store";
 import { CardView } from "../ui/CardView";
 import { downloadJson } from "../ui/download";
@@ -407,6 +407,7 @@ function PairPicker({ data, study, cards, onAdd }: { data: EngineData; study: De
 
   // 卡组里的怪兽有哪些种族、属性，选项只列这些
   const monsters = cards.map((id) => data.cards.get(id)!).filter((c) => matches(c, {}));
+  const archetypes = useMemo(() => deckArchetypes(data, study.main), [data, study.main]);
   const races = RACES.filter(([bit]) => monsters.some((c) => (c.data.race & BigInt(bit)) !== 0n));
   const attrs = ATTRIBUTES.filter(([bit]) => monsters.some((c) => (c.data.attribute & bit) !== 0));
   const members = any ? deckMatches(data, study, filter) : [];
@@ -425,7 +426,7 @@ function PairPicker({ data, study, cards, onAdd }: { data: EngineData; study: De
   };
   const select = (value: number, set: (v: number) => void, label: string, withAny: boolean) => (
     <select value={value} onChange={(e) => set(Number(e.target.value))} aria-label={label}>
-      {withAny && <option value={ANY}>任意…（按种族、属性、等级）</option>}
+      {withAny && <option value={ANY}>任意…（按字段、种族、属性、等级）</option>}
       {options.map((id) => (
         <option key={id} value={id}>
           {data.name(id)}
@@ -439,7 +440,7 @@ function PairPicker({ data, study, cards, onAdd }: { data: EngineData; study: De
     <section className="panel">
       <h2 className="section-title">2. 两卡组合</h2>
       <p className="muted">
-        两张一起才动得起来，或者想看两张一起能多打出什么。第二张可以选「任意…」，比如 Regulus + 任意魔法师族怪兽。两张都要通常召唤的组合会被拦下。
+        两张一起才动得起来，或者想看两张一起能多打出什么。第二张可以选「任意…」，比如 Regulus + 任意魔法师族怪兽，或者某张卡 + 任意「Dark Magician」字段的卡（卡组里有哪些字段会自动列出来）。两张都要通常召唤的组合会被拦下。
       </p>
       <div className="chips-edit">
         {select(a, setA, "第一张", false)}
@@ -449,6 +450,21 @@ function PairPicker({ data, study, cards, onAdd }: { data: EngineData; study: De
       {any && (
         <div className="wildcard">
           <div className="chips-edit">
+            <select
+              value={filter.setcode ?? 0}
+              onChange={(e) => {
+                const a = archetypes.find((x) => x.setcode === Number(e.target.value));
+                setF({ setcode: a?.setcode, setname: a?.name });
+              }}
+              aria-label="字段"
+            >
+              <option value={0}>字段不限</option>
+              {archetypes.map((a) => (
+                <option key={a.setcode} value={a.setcode}>
+                  「{a.name}」字段（卡组里 {a.cards} 张）
+                </option>
+              ))}
+            </select>
             <select value={filter.race ?? 0} onChange={(e) => setF({ race: Number(e.target.value) })} aria-label="种族">
               <option value={0}>种族不限</option>
               {races.map(([bit, name]) => (

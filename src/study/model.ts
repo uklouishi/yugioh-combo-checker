@@ -7,8 +7,12 @@
 import { z } from "zod";
 import { CardId, Combo } from "../model/schema";
 
-/** 「任意魔法师族怪兽」这类条件：都不写就是任意怪兽。 */
+/** 「任意魔法师族怪兽」「任意 Dark Magician 字段的卡」这类条件：都不写就是任意怪兽。 */
 export const CardFilter = z.object({
+  /** 字段代码（引擎的 setcode）。只按字段时魔法、陷阱也算。 */
+  setcode: z.number().int().positive().optional(),
+  /** 字段名，只用来显示。 */
+  setname: z.string().optional(),
   /** 种族（引擎的 RACE 位）。 */
   race: z.number().int().positive().optional(),
   /** 属性（引擎的 ATTRIBUTE 位）。 */
@@ -73,6 +77,7 @@ export const sameHand = (a: number[], b: number[]) => a.length === b.length && [
 export const starterHand = (s: Pick<Starter, "cards" | "wildcard">) => (s.wildcard ? [...s.cards, s.wildcard.representative] : s.cards);
 
 const sameFilter = (a?: CardFilter, b?: CardFilter) =>
+  (a?.setcode ?? 0) === (b?.setcode ?? 0) &&
   (a?.race ?? 0) === (b?.race ?? 0) && (a?.attribute ?? 0) === (b?.attribute ?? 0) && (a?.maxLevel ?? 0) === (b?.maxLevel ?? 0);
 
 /** 两个动点是不是同一手（卡一样，通配条件也一样）。 */
