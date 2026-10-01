@@ -140,7 +140,11 @@ export function toCombo(session: DuelSession, opts: ExportOptions = {}): Combo {
       } else if (t.kind === "move") {
         const m = t as MoveEntry;
         if (m.to.controller !== 0 && m.from.controller !== 0) continue;
-        if (m.from.location === m.to.location && !(m.from.location & OVERLAY)) continue; // 同一区域内换格子、改变表示形式
+        if (m.from.location === m.to.location && !(m.from.location & OVERLAY)) {
+          // 改变表示形式、手卡/卡组/墓地内部换顺序不算移动；场上换格子（比如额外怪兽区 → 主要怪兽区）要记下来
+          const onFieldZone = m.from.location === OcgLocation.MZONE || m.from.location === OcgLocation.SZONE;
+          if (!onFieldZone || m.from.sequence === m.to.sequence) continue;
+        }
         if (m.to.location & OVERLAY && m.from.location === OcgLocation.MZONE && m.from.controller === 0) {
           // 超量素材：combo 格式没有素材区，记在墓地
           const src = zoneOf(m.from)!;

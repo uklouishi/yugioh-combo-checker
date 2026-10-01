@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCards } from "../cards/useCards";
 import { handtrapById, handtraps } from "../data";
 import { useCombos } from "../data/store";
-import { simulatePartial, type Frame } from "../model/board";
+import { simulateLenient } from "../model/board";
 import { deriveInterruptions } from "../model/interruptions";
 import { buildBeats, type ChainMark } from "../model/playback";
 import type { Combo } from "../model/schema";
@@ -21,37 +21,9 @@ export function ViewPage({ id, initialStep }: { id: string; initialStep: number 
   return <Viewer combo={combo} initialStep={initialStep} />;
 }
 
-/** 场地模拟对不上（比如旧版本导出的文件）时，说明哪一步出错，而不是整页空白。 */
-function BrokenCombo({ combo, error }: { combo: Combo; error: string }) {
-  return (
-    <main className="page">
-      <h1>这个 combo 没法在场地上播放</h1>
-      <p className="muted">{combo.title}</p>
-      <p className="errors-inline">{error}</p>
-      <p className="muted">
-        {combo.id.startsWith("play-")
-          ? "它是用旧版本的「实战练习」导出的，同名卡在几个格子里时会分不清是哪一张。回到练习页重新打一遍再点「分析」就能正常播放。"
-          : "可以在编辑页修正这一步的卡片移动。"}
-      </p>
-      <div className="row-actions">
-        <a className="btn" href={href.analyze(combo.id)}>
-          回到分析
-        </a>
-        <a className="btn" href={href.edit(combo.id)}>
-          编辑
-        </a>
-      </div>
-    </main>
-  );
-}
-
 export function Viewer({ combo, initialStep }: { combo: Combo; initialStep: number }) {
-  const sim = useMemo(() => simulatePartial(combo), [combo]);
-  if (sim.error) return <BrokenCombo combo={combo} error={sim.error} />;
-  return <Playback combo={combo} frames={sim.frames} initialStep={initialStep} />;
-}
-
-function Playback({ combo, frames, initialStep }: { combo: Combo; frames: Frame[]; initialStep: number }) {
+  // 宽松模式：数据里有卡片位置对不上时也照样播放，在页面上提示
+  const { frames, warnings } = useMemo(() => simulateLenient(combo), [combo]);
   const [frame, setFrame] = useState(Math.min(initialStep, combo.steps.length));
   const [openCard, setOpenCard] = useState<number | null>(null);
   const frameRef = useRef(frame);
@@ -64,7 +36,10 @@ function Playback({ combo, frames, initialStep }: { combo: Combo; frames: Frame[
 
   // 正在播放的一步（step 下标）和播到第几拍；播放时 frame 已经是这一步之后
   const [play, setPlay] = useState<{ step: number; beat: number } | null>(null);
-  const beats = useMemo(() => (play ? buildBeats(combo.steps[play.step], frames[play.step].board) : null), [combo, frames, play?.step]);
+  const beats = useMemo(
+    () => (play ? buildBeats(combo.steps[play.step], frames[play.step].board, { warnings: [] }) : null),
+    [combo, frames, play?.step],
+  );
   const beat = play && beats ? beats[play.beat] : null;
   const fieldRef = useRef<HTMLDivElement>(null);
   useFlight(
@@ -128,6 +103,17 @@ function Playback({ combo, frames, initialStep }: { combo: Combo; frames: Frame[
           </a>
         </div>
       </div>
+
+      {warnings.length > 0 && (
+        <details className="sim-warnings">
+          <summary>这条 combo 里有 {warnings.length} 处卡片位置和记录对不上，已按最接近的情况播放</summary>
+          <ul>
+            {warnings.map((w, i) => (
+              <li key={i}>{w}</li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       <BeatCaption caption={beat?.caption} chain={beat?.chain} active={beat?.active} idle={frame === 0 ? (animate ? "起手局面。点 ▶ 或按 → 开始，每一步都会演示卡片怎么移动。" : "起手局面。点 ▶ 或按 → 开始。") : `步骤 ${frame}：${combo.steps[frame - 1].title}`} />
 
