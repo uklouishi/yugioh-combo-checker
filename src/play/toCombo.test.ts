@@ -6,7 +6,7 @@ import { EngineData } from "../engine/data";
 import { startDuel } from "../engine/run";
 import type { DuelSession, DuelSetup } from "../engine/session";
 import { buildBeats } from "../model/playback";
-import { simulate } from "../model/board";
+import { simulate, simulatePartial } from "../model/board";
 import { checkCombos } from "../model/validate";
 import { canExport, toCombo } from "./toCombo";
 
@@ -100,5 +100,87 @@ describe("toCombo", () => {
     expect(beats.map((b) => b.kind)).toEqual(["summon", "move", "activate", "resolve", "move"]);
     expect(beats.find((b) => b.kind === "activate")?.caption).toContain("CHAIN 1");
     expect(beats.find((b) => b.move?.card.id === POPLAR)?.move?.resolving).toBe(1);
+  });
+
+  it("records Xyz materials as going to the GY, not to the Extra Deck", () => {
+    // ocgcore-wasm 把超量素材的位置写成「超量怪兽所在区域 + overlay_sequence」（OVERLAY 位被去掉）
+    const WICCAT = 27632520;
+    const MZONE = 4;
+    const EXTRA = 64;
+    const GRAVE = 16;
+    const HAND = 2;
+    const at = (location: number, sequence: number, extra: object = {}) => ({ controller: 0 as const, location, sequence, position: 1, ...extra });
+    const session = {
+      data,
+      setup: { main: Array(40).fill(OAK), extra: [WICCAT], hand: [ASH, POPLAR], opponentHand: [], format: "tcg", seed: 1 },
+      actions: [
+        { label: "通常召唤 Snake-Eye Ash", at: 0 },
+        { label: "特殊召唤 Snake-Eyes Poplar", at: 1 },
+        { label: "特殊召唤 Fairy Tail - Wiccat", at: 2 },
+        { label: "发动 Fairy Tail - Wiccat", at: 3 },
+      ],
+      hits: [],
+      trace: [
+        { action: 0, kind: "move", code: ASH, from: at(HAND, 0), to: at(MZONE, 2) },
+        { action: 0, kind: "summon", code: ASH, controller: 0, normal: true },
+        { action: 1, kind: "move", code: POPLAR, from: at(HAND, 0), to: at(MZONE, 3) },
+        { action: 1, kind: "summon", code: POPLAR, controller: 0, normal: false },
+        // 素材挂到还在额外卡组的 Wiccat 下面，然后 Wiccat 出场
+        { action: 2, kind: "move", code: ASH, from: at(MZONE, 2), to: at(EXTRA, 0, { overlay_sequence: 0 }) },
+        { action: 2, kind: "move", code: POPLAR, from: at(MZONE, 3), to: at(EXTRA, 0, { overlay_sequence: 1 }) },
+        { action: 2, kind: "move", code: WICCAT, from: at(EXTRA, 0), to: at(MZONE, 4) },
+        { action: 2, kind: "summon", code: WICCAT, controller: 0, normal: false },
+        // 取除素材：从主要怪兽区第 5 格下面送去墓地
+        { action: 3, kind: "chain", code: WICCAT, controller: 0, location: MZONE, sequence: 4, link: 1 },
+        { action: 3, kind: "move", code: ASH, from: at(MZONE, 4, { overlay_sequence: 0 }), to: at(GRAVE, 0) },
+        { action: 3, kind: "move", code: POPLAR, from: at(MZONE, 4, { overlay_sequence: 0 }), to: at(GRAVE, 1) },
+        { action: 3, kind: "solving", link: 1 },
+        { action: 3, kind: "solved", link: 1 },
+      ],
+      field: () => [{ monsters: [null, null, null, null, { code: WICCAT }], spells: [], hand: [] }, {}],
+    } as unknown as DuelSession;
+
+    const combo = toCombo(session, { now: new Date("2026-10-01T00:00:00Z") });
+    const summon = combo.steps[2];
+    expect(summon.moves.map((mv) => [mv.card.id, mv.from, mv.to])).toEqual([
+      [ASH, "monster", "gy"],
+      [POPLAR, "monster", "gy"],
+      [WICCAT, "extra", "monster"],
+    ]);
+    // 取除素材不再记成「从怪兽区送墓」（素材早就记在墓地了）
+    expect(combo.steps[3].moves).toEqual([]);
+    expect(simulatePartial(combo).error).toBeUndefined();
+  });
+
+  it("keeps cards activated before the first action (e.g. a Quick-Play at the start of the turn)", () => {
+    const DTW = 40235813; // Dark Time Wizard（速攻魔法）
+    const GRAVEROBBER = 65118318;
+    const at = (location: number, sequence: number) => ({ controller: 0 as const, location, sequence, position: 1 });
+    const session = {
+      data,
+      setup: { main: [GRAVEROBBER, ...Array(39).fill(OAK)], extra: [], hand: [DTW, ASH], opponentHand: [], format: "tcg", seed: 1 },
+      actions: [{ label: "通常召唤 Snake-Eye Ash", at: 3 }],
+      hits: [],
+      trace: [
+        { action: -1, kind: "move", code: DTW, from: at(2, 0), to: at(8, 2) },
+        { action: -1, kind: "chain", code: DTW, controller: 0, location: 8, sequence: 2, link: 1 },
+        { action: -1, kind: "solving", link: 1 },
+        { action: -1, kind: "move", code: GRAVEROBBER, from: at(1, 0), to: at(2, 1) },
+        { action: -1, kind: "solved", link: 1 },
+        { action: -1, kind: "move", code: DTW, from: at(8, 2), to: at(16, 0) },
+        { action: 0, kind: "move", code: ASH, from: at(2, 0), to: at(4, 2) },
+        { action: 0, kind: "summon", code: ASH, controller: 0, normal: true },
+      ],
+      field: () => [{ monsters: [null, null, { code: ASH }], spells: [], hand: [{ code: GRAVEROBBER }] }, {}],
+    } as unknown as DuelSession;
+
+    const combo = toCombo(session, { now: new Date("2026-10-01T00:00:00Z") });
+    expect(combo.steps.map((st) => st.title)).toEqual(["发动 Dark Time Wizard", "通常召唤 Snake-Eye Ash"]);
+    expect(combo.steps[0].moves.map((mv) => [mv.card.id, mv.from, mv.to])).toEqual([
+      [DTW, "hand", "spell_trap"],
+      [GRAVEROBBER, "deck", "hand"],
+      [DTW, "spell_trap", "gy"],
+    ]);
+    expect(simulatePartial(combo).error).toBeUndefined();
   });
 });

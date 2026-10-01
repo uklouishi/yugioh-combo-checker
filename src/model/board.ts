@@ -75,11 +75,31 @@ export interface Loc {
   index?: number;
 }
 
+/**
+ * 宽松模式：卡不在记录的位置时不报错，而是去别的区域找；哪里都没有就当它凭空出现；
+ * 目标格子被占时换一个空格。播放页用它，这样数据有小问题也能看，问题记在 warnings 里。
+ */
+export interface Leniency {
+  warnings: string[];
+}
+
 function take(b: Board, m: Move): PlacedCard {
   return takeAt(b, m)[0];
 }
 
-function takeAt(b: Board, m: Move): [PlacedCard, Loc] {
+function takeAt(b: Board, m: Move, lenient?: Leniency): [PlacedCard, Loc] {
+  try {
+    return takeStrict(b, m);
+  } catch (e) {
+    if (!lenient || !(e instanceof BoardError)) throw e;
+    lenient.warnings.push(e.message);
+    const loc = locate(b, m.card.id, m.from);
+    if (loc && loc.zone !== "deck") return takeStrict(b, { ...m, from: loc.zone, fromSlot: loc.index, slot: undefined });
+    return [{ card: m.card }, { zone: m.from }];
+  }
+}
+
+function takeStrict(b: Board, m: Move): [PlacedCard, Loc] {
   const { from, card } = m;
   if (from === "deck") {
     if (b.deckCount <= 0) throw new BoardError(`卡组已经没有卡了，无法取出 ${card.name}`);
@@ -105,7 +125,19 @@ function takeAt(b: Board, m: Move): [PlacedCard, Loc] {
   return [pile.splice(i, 1)[0], from === "hand" ? { zone: from, index: i } : { zone: from }];
 }
 
-function put(b: Board, m: Move, placed: PlacedCard): Loc {
+function put(b: Board, m: Move, placed: PlacedCard, lenient?: Leniency): Loc {
+  try {
+    return putStrict(b, m, placed);
+  } catch (e) {
+    if (!lenient || !(e instanceof BoardError) || !isSlotted(m.to)) throw e;
+    lenient.warnings.push(e.message);
+    // 指定的格子被占了：换第一个空格；整个区域都满了就不放（这张卡暂时不显示）
+    const free = b[m.to].findIndex((p) => p === null);
+    return free < 0 ? { zone: m.to } : putStrict(b, { ...m, slot: free }, placed);
+  }
+}
+
+function putStrict(b: Board, m: Move, placed: PlacedCard): Loc {
   const card: PlacedCard = { card: placed.card, faceDown: m.faceDown, defense: m.defense };
   const { to } = m;
   if (to === "deck") {
@@ -126,9 +158,9 @@ function put(b: Board, m: Move, placed: PlacedCard): Loc {
 }
 
 /** 在局面上执行一次移动（直接修改 b），返回卡从哪里来、到了哪里。 */
-export function applyMove(b: Board, m: Move): { from: Loc; to: Loc } {
-  const [placed, from] = takeAt(b, m);
-  return { from, to: put(b, m, placed) };
+export function applyMove(b: Board, m: Move, lenient?: Leniency): { from: Loc; to: Loc } {
+  const [placed, from] = takeAt(b, m, lenient);
+  return { from, to: put(b, m, placed, lenient) };
 }
 
 /** 找一张卡现在在哪：先看给定区域，找不到再找全场。 */
@@ -175,6 +207,21 @@ export function zoneName(z: Zone): string {
     gy: "墓地",
     banished: "除外区",
   }[z];
+}
+
+/** 播放页用：宽松模式算出每一步之后的局面，对不上的地方记在 warnings 里（带步骤号）。 */
+export function simulateLenient(combo: Combo): { frames: Frame[]; warnings: string[] } {
+  let board = initialBoard(combo);
+  const frames: Frame[] = [{ stepIndex: -1, board, moved: [] }];
+  const warnings: string[] = [];
+  combo.steps.forEach((step, stepIndex) => {
+    board = clone(board);
+    const lenient: Leniency = { warnings: [] };
+    for (const m of step.moves) applyMove(board, m, lenient);
+    warnings.push(...lenient.warnings.map((w) => `步骤 ${stepIndex + 1}：${w}`));
+    frames.push({ stepIndex, board, moved: step.moves });
+  });
+  return { frames, warnings };
 }
 
 /** 编辑时用：遇到错误就停下，返回已经算出的局面和错误信息。 */
