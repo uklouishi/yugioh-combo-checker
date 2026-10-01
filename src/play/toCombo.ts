@@ -276,6 +276,9 @@ export function toCombo(session: DuelSession, opts: ExportOptions = {}): Combo {
     endboard: {
       cards: board.map((c) => ref(c.code)),
       description: `场上 ${me.monsters.filter(Boolean).length} 只怪兽、${me.spells.filter(Boolean).length} 张魔陷，手卡 ${me.hand.length} 张。`,
+      grave: me.grave.map((c) => ref(c.code)),
+      banished: me.banished.map((c) => ref(c.code)),
+      materials: me.monsters.flatMap((c) => (c ? c.overlays.map(ref) : [])),
     },
   };
   return Combo.parse(combo);

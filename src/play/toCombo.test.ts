@@ -137,7 +137,7 @@ describe("toCombo", () => {
         { action: 3, kind: "solving", link: 1 },
         { action: 3, kind: "solved", link: 1 },
       ],
-      field: () => [{ monsters: [null, null, null, null, { code: WICCAT }], spells: [], hand: [] }, {}],
+      field: () => [{ monsters: [null, null, null, null, { code: WICCAT, overlays: [] }], spells: [], hand: [], grave: [], banished: [] }, {}],
     } as unknown as DuelSession;
 
     const combo = toCombo(session, { now: new Date("2026-10-01T00:00:00Z") });
@@ -171,7 +171,7 @@ describe("toCombo", () => {
         { action: 0, kind: "move", code: ASH, from: at(2, 0), to: at(4, 2) },
         { action: 0, kind: "summon", code: ASH, controller: 0, normal: true },
       ],
-      field: () => [{ monsters: [null, null, { code: ASH }], spells: [], hand: [{ code: GRAVEROBBER }] }, {}],
+      field: () => [{ monsters: [null, null, { code: ASH, overlays: [] }], spells: [], hand: [{ code: GRAVEROBBER }], grave: [{ code: DTW }], banished: [] }, {}],
     } as unknown as DuelSession;
 
     const combo = toCombo(session, { now: new Date("2026-10-01T00:00:00Z") });
@@ -182,5 +182,6 @@ describe("toCombo", () => {
       [DTW, "spell_trap", "gy"],
     ]);
     expect(simulatePartial(combo).error).toBeUndefined();
+    expect(combo.endboard.grave?.map((c) => c.id)).toEqual([DTW]);
   });
 });
