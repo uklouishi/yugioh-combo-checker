@@ -191,9 +191,7 @@ function StudyList({ data, studies }: { data: EngineData; studies: DeckStudy[] }
 function StudyDetail({ data, study }: { data: EngineData; study: DeckStudy }) {
   const update = (s: DeckStudy) => studyStore.save(s);
   const mainCards = unique(study.main);
-  const extraCards = unique(study.extra);
   const singles = new Set(study.starters.filter(isSingle).map((s) => s.cards[0]));
-  const keys = new Set(study.keyCards);
   const cmp = useMemo(() => compareStudy(study), [study]);
   const htSet = useMemo(() => new Set(roleHandtraps(data, study)), [data, study]);
   const handOpts = useMemo(() => {
@@ -220,8 +218,6 @@ function StudyDetail({ data, study }: { data: EngineData; study: DeckStudy }) {
     if (study.routes[existing.id] && !window.confirm(`${data.name(card)} 已经打过路线，删掉这个动点会连路线一起删掉。确定吗？`)) return;
     update(removeStarter(study, existing.id));
   };
-  const toggleKey = (card: number) =>
-    update({ ...study, keyCards: keys.has(card) ? study.keyCards.filter((c) => c !== card) : [...study.keyCards, card] });
   const toggleBrick = (card: number) =>
     update({ ...study, bricks: study.bricks.includes(card) ? study.bricks.filter((c) => c !== card) : [...study.bricks, card] });
   const toggleNormal = (card: number) =>
@@ -305,27 +301,7 @@ function StudyDetail({ data, study }: { data: EngineData; study: DeckStudy }) {
 
       <PairPicker data={data} study={study} cards={mainCards} onAdd={(cards, wildcard) => update(addStarter(study, cards, new Date(), wildcard))} />
 
-      <section className="panel">
-        <h2 className="section-title">3. 重要终端</h2>
-        <p className="muted">
-          选出这副卡最想留在场上的卡（Baronne、Apollousa 这类阻抗）。对比时只数这些卡，手坑打掉越多越该防。研究会记住你选的卡，以后的路线自动套用。
-        </p>
-        {extraCards.length > 0 && (
-          <div className="deck-grid" aria-label="额外卡组">
-            {extraCards.map((id) => (
-              <KeyCard key={id} data={data} id={id} on={keys.has(id)} onToggle={toggleKey} />
-            ))}
-          </div>
-        )}
-        <details>
-          <summary className="muted">主卡组的卡（场地魔法、永续卡等）</summary>
-          <div className="deck-grid extra">
-            {mainCards.map((id) => (
-              <KeyCard key={id} data={data} id={id} on={keys.has(id)} onToggle={toggleKey} />
-            ))}
-          </div>
-        </details>
-      </section>
+      <Marks data={data} study={study} handtraps={htSet} onChange={update} />
 
       <section className="panel">
         <h2 className="section-title">4. 逐个打一遍</h2>
@@ -402,23 +378,10 @@ function StudyDetail({ data, study }: { data: EngineData; study: DeckStudy }) {
         )}
       </section>
 
-      <Comparison data={data} study={study} cmp={cmp} hands={first} />
-      <StudyRecovery data={data} study={study} cmp={cmp} isHandtrap={handOpts.isHandtrap} onChange={update} />
-      <Roles data={data} study={study} handtraps={htSet} onChange={update} />
+      <Comparison data={data} study={study} cmp={cmp} hands={first} isHandtrap={handOpts.isHandtrap} onChange={update} />
       <Rates data={data} study={study} first={first} second={second} onToggleBrick={toggleBrick} label={label} />
       <SideSim data={data} study={study} cmp={cmp} base={{ first, second }} handOpts={handOpts} onChange={update} label={label} />
     </main>
-  );
-}
-
-function KeyCard({ data, id, on, onToggle }: { data: EngineData; id: number; on: boolean; onToggle: (id: number) => void }) {
-  return (
-    <button className={`deck-card${on ? " active picked" : ""}`} onClick={() => onToggle(id)} title={data.name(id)} aria-pressed={on}>
-      <span className="thumb">
-        <CardView id={id} name={data.name(id)} />
-      </span>
-      {on && <span className="x">★</span>}
-    </button>
   );
 }
 
@@ -564,7 +527,21 @@ function Outcome({ o }: { o: HandtrapOutcome }) {
   );
 }
 
-function Comparison({ data, study, cmp, hands }: { data: EngineData; study: DeckStudy; cmp: StudyComparison; hands: HandStats | null }) {
+function Comparison({
+  data,
+  study,
+  cmp,
+  hands,
+  isHandtrap,
+  onChange,
+}: {
+  data: EngineData;
+  study: DeckStudy;
+  cmp: StudyComparison;
+  hands: HandStats | null;
+  isHandtrap: (id: number) => boolean;
+  onChange: (s: DeckStudy) => void;
+}) {
   const [open, setOpen] = useState<number | null>(null);
   // 有起手模拟时按「考虑上手和补点」的分数排
   const weighted = hands && hands.played > 0 ? hands.weighted : null;
@@ -627,6 +604,8 @@ function Comparison({ data, study, cmp, hands }: { data: EngineData; study: Deck
           </tbody>
         </table>
       </div>
+
+      <StudyRecovery data={data} study={study} cmp={cmp} isHandtrap={isHandtrap} onChange={onChange} />
 
       <h3 className="sub-title">手坑优先级</h3>
       {weighted && hands && (
@@ -749,11 +728,11 @@ function rateRows(study: DeckStudy): RateRow[] {
     ["至少 1 个动点", (h) => h.anyStarter],
     ["2 个以上不同动点（补点）", (h) => h.multiStarter, "两个不同的动点，用到的卡不重叠"],
     ["卡手（没有动点）", (h) => 1 - h.anyStarter],
-    ["至少 1 张手坑", (h) => h.handtrap1, "第 6 步标为手坑的卡"],
+    ["至少 1 张手坑", (h) => h.handtrap1, "第 3 步标为手坑的卡"],
     ["2 张以上手坑", (h) => h.handtrap2],
     ...(study.breakers.length
       ? ([
-          ["至少 1 张解牌", (h) => h.breaker1, "第 6 步标为解牌的卡，后攻破场用"],
+          ["至少 1 张解牌", (h) => h.breaker1, "第 3 步标为解牌的卡，后攻破场用"],
           ["2 张以上解牌", (h) => h.breaker2],
           ["至少 1 张手坑或解牌", (h) => h.interaction, "后攻时手里至少有一张能干扰或破场的卡"],
         ] as RateRow[])
@@ -773,59 +752,85 @@ function roleHandtraps(data: EngineData, study: DeckStudy): number[] {
   return unique([...study.main, ...study.side]).filter((id) => handtrapById.has(id) || handtrapById.has(data.canonical(id)));
 }
 
-function Roles({ data, study, handtraps, onChange }: { data: EngineData; study: DeckStudy; handtraps: Set<number>; onChange: (s: DeckStudy) => void }) {
-  const [mode, setMode] = useState<"handtrap" | "breaker">("handtrap");
+type MarkMode = "key" | "handtrap" | "breaker";
+
+/** 标记卡片类型：重要终端、手坑、解牌放在一起标，用不同颜色区分。 */
+function Marks({ data, study, handtraps, onChange }: { data: EngineData; study: DeckStudy; handtraps: Set<number>; onChange: (s: DeckStudy) => void }) {
+  const [mode, setMode] = useState<MarkMode>("key");
+  const keys = new Set(study.keyCards);
   const breakers = new Set(study.breakers);
+  const extraCards = unique(study.extra);
   const sideOnly = unique(study.side).filter((id) => !study.main.includes(id));
   const toggle = (id: number) => {
-    if (mode === "handtrap") {
+    if (mode === "key") onChange({ ...study, keyCards: keys.has(id) ? study.keyCards.filter((c) => c !== id) : [...study.keyCards, id] });
+    else if (mode === "handtrap") {
       const list = [...handtraps];
       onChange({ ...study, handtraps: handtraps.has(id) ? list.filter((c) => c !== id) : [...list, id] });
-    } else {
-      onChange({ ...study, breakers: breakers.has(id) ? study.breakers.filter((c) => c !== id) : [...study.breakers, id] });
-    }
+    } else onChange({ ...study, breakers: breakers.has(id) ? study.breakers.filter((c) => c !== id) : [...study.breakers, id] });
   };
   const card = (id: number) => {
-    const ht = handtraps.has(id);
-    const bk = breakers.has(id);
-    const on = mode === "handtrap" ? ht : bk;
+    const tags: [MarkMode, string][] = [];
+    if (keys.has(id)) tags.push(["key", "终端"]);
+    if (handtraps.has(id)) tags.push(["handtrap", "手坑"]);
+    if (breakers.has(id)) tags.push(["breaker", "解牌"]);
+    const on = tags.some(([m]) => m === mode);
     return (
-      <button key={id} className={`deck-card${on ? " active picked" : ""}${ht || bk ? " role" : ""}`} onClick={() => toggle(id)} title={data.name(id)} aria-pressed={on}>
+      <button key={id} className={`deck-card mark-card${on ? ` on ${mode}` : ""}`} onClick={() => toggle(id)} title={data.name(id)} aria-pressed={on}>
         <span className="thumb">
           <CardView id={id} name={data.name(id)} />
         </span>
-        {(ht || bk) && <span className={`x${bk && !ht ? " breaker" : ""}`}>{ht && bk ? "坑/解" : ht ? "坑" : "解"}</span>}
+        {tags.length > 0 && (
+          <span className="mark-tags">
+            {tags.map(([m, text]) => (
+              <span key={m} className={`mark-tag ${m}`}>
+                {text}
+              </span>
+            ))}
+          </span>
+        )}
       </button>
     );
   };
+  const modes: [MarkMode, string][] = [
+    ["key", `重要终端（${study.keyCards.length}）`],
+    ["handtrap", `手坑（${handtraps.size}）`],
+    ["breaker", `解牌（${breakers.size}）`],
+  ];
   return (
     <section className="panel">
-      <h2 className="section-title">6. 手坑和解牌</h2>
+      <h2 className="section-title">3. 标记卡片类型</h2>
       <p className="muted">
-        标出卡组和 side 里的手坑（Ash Blossom、Nibiru 这类对手回合从手里用的卡）和解牌（Super Polymerization、Lava Golem、Dark Ruler No More 这类后攻破场的卡）。
+        先选要标哪一类，再点卡。<span className="mark-tag key">终端</span> 是这副卡最想留在场上的卡（Baronne、Apollousa 这类阻抗），对比时只数这些卡；
+        <span className="mark-tag handtrap">手坑</span> 是 Ash Blossom、Nibiru 这类对手回合从手里用的卡；
+        <span className="mark-tag breaker">解牌</span> 是 Super Polymerization、Lava Golem 这类后攻破场的卡。
         {!study.handtraps && " 手坑已按网站的手坑表预选，请检查。"}
-        标好后点「确认已标好」，才能用第 8 步的换 side 模拟。
+        标好手坑和解牌后点「确认已标好」，才能用第 7 步的换 side 模拟。
       </p>
-      <div className="seg" role="radiogroup" aria-label="标记什么">
-        {(
-          [
-            ["handtrap", `标手坑（${handtraps.size}）`],
-            ["breaker", `标解牌（${breakers.size}）`],
-          ] as const
-        ).map(([m, text]) => (
-          <label key={m} className={mode === m ? "on" : undefined}>
-            <input type="radio" name="role-mode" checked={mode === m} onChange={() => setMode(m)} />
+      <div className={`seg mark-seg ${mode}`} role="radiogroup" aria-label="标记什么">
+        {modes.map(([m, text]) => (
+          <label key={m} className={mode === m ? `on ${m}` : undefined}>
+            <input type="radio" name="mark-mode" checked={mode === m} onChange={() => setMode(m)} />
             {text}
           </label>
         ))}
       </div>
+      {mode === "key" && extraCards.length > 0 && (
+        <>
+          <h3 className="sub-title">额外卡组</h3>
+          <div className="deck-grid">{extraCards.map(card)}</div>
+        </>
+      )}
       <h3 className="sub-title">主卡组</h3>
       <div className="deck-grid">{unique(study.main).map(card)}</div>
-      <h3 className="sub-title">side</h3>
-      {sideOnly.length ? <div className="deck-grid">{sideOnly.map(card)}</div> : <SideImport data={data} study={study} onChange={onChange} />}
+      {mode !== "key" && (
+        <>
+          <h3 className="sub-title">side</h3>
+          {sideOnly.length ? <div className="deck-grid">{sideOnly.map(card)}</div> : <SideImport data={data} study={study} onChange={onChange} />}
+        </>
+      )}
       <div className="row-actions">
         {study.rolesConfirmed ? (
-          <span className="muted">✓ 已确认。之后改标记，上手率和换 side 模拟会跟着更新。</span>
+          <span className="muted">✓ 手坑和解牌已确认。之后改标记，上手率和换 side 模拟会跟着更新。</span>
         ) : (
           <button className="btn primary" onClick={() => onChange({ ...study, handtraps: [...handtraps], rolesConfirmed: true })}>
             确认已标好
@@ -896,9 +901,9 @@ function SideSim({
   if (!study.rolesConfirmed || !study.side.length) {
     return (
       <section className="panel">
-        <h2 className="section-title">8. 换 side 模拟</h2>
+        <h2 className="section-title">7. 换 side 模拟</h2>
         <p className="muted">
-          {!study.side.length ? "这个研究还没有 side，先在第 6 步导入 side。" : "先在第 6 步标好卡组里的手坑和解牌，点「确认已标好」后才能用。"}
+          {!study.side.length ? "这个研究还没有 side，先在第 3 步（标手坑或解牌时）导入 side。" : "先在第 3 步标好卡组里的手坑和解牌，点「确认已标好」后才能用。"}
         </p>
       </section>
     );
@@ -951,7 +956,7 @@ function SideSim({
 
   return (
     <section className="panel">
-      <h2 className="section-title">8. 换 side 模拟</h2>
+      <h2 className="section-title">7. 换 side 模拟</h2>
       <p className="muted">先攻、后攻各存一套换法。选好换出和换入的卡，下面按换完的主卡组重新算所有上手率，和原卡组对比。</p>
       <div className="seg" role="radiogroup" aria-label="先攻还是后攻">
         {(
@@ -1057,9 +1062,9 @@ function Rates({
   const rows = rateRows(study);
   return (
     <section className="panel">
-      <h2 className="section-title">7. 上手率</h2>
+      <h2 className="section-title">6. 上手率</h2>
       <p className="muted">
-        按主卡组 {study.main.length} 张随机抽 {first.hands.toLocaleString()} 手统计。先攻起手 5 张，后攻 6 张。手坑和解牌按第 6 步标的算。
+        按主卡组 {study.main.length} 张随机抽 {first.hands.toLocaleString()} 手统计。先攻起手 5 张，后攻 6 张。手坑和解牌按第 3 步标的算。
       </p>
       <div className="matrix-scroll">
         <table className="matrix study-routes">

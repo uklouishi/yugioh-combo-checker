@@ -99,11 +99,12 @@ export function StudyRecovery({
   };
 
   return (
-    <section className="panel">
-      <h2 className="section-title">被打后能不能续上</h2>
+    <div className="probe">
+      <h3 className="sub-title">被打后能不能续上</h3>
+      <p className="probe-tip">建议所有动点都打完后，先在这里让引擎试一遍并确认结果，再看下面的手坑优先级。确认过的续法才会算进优先级。</p>
       <p className="muted">
         让引擎照着你打过的每条路线打，到吃坑点时对手用手坑打断，再试手里另有某一张卡时能不能续出路线里的关键怪兽（额外怪兽、仪式怪兽或重要终端）。
-        结果按卡列出，你对每张卡点「对」或「不对」（展开可以逐个吃坑点改），点了「对」的才算进上面的手坑优先级。对手会挑你续不上的那一下打。
+        结果按卡列出，你对每张卡点「对」或「不对」（展开可以逐个吃坑点改），点了「对」的才算进下面的手坑优先级。对手会挑你续不上的那一下打。
       </p>
       {!scored.length ? (
         <p className="muted">先打完至少一条有重要终端的路线。</p>
@@ -184,6 +185,6 @@ export function StudyRecovery({
         })}
       </ul>
       {study.recoveries.length > 0 && <p className="muted">没列出来的情况是引擎没试出续法（或者路线没能照着重放到吃坑点）。被 Nibiru 这类打召唤次数的手坑断掉的情况不试。</p>}
-    </section>
+    </div>
   );
 }
