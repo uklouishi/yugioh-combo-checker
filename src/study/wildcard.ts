@@ -90,12 +90,46 @@ export function deckArchetypes(data: EngineData, main: number[]): { setcode: num
   const out = new Map<number, number>();
   for (const id of main) {
     const sets = new Set<number>();
-    for (const s of data.cards.get(id)?.data.setcodes ?? []) for (const t of named.get(s & 0xfff) ?? []) if ((s & t) === t) sets.add(t);
+    for (const s of data.cards.get(id)?.data.setcodes ?? []) {
+      const parents = (named.get(s & 0xfff) ?? []).filter((t) => (s & t) === t);
+      // 引擎的字段表里没有名字的字段（比如 Fairy Tail）也列出来，名字从卡名里找
+      for (const t of parents.length ? parents : [s]) sets.add(t);
+    }
     for (const set of sets) out.set(set, (out.get(set) ?? 0) + 1);
   }
   return [...out]
-    .map(([setcode, cards]) => ({ setcode, name: data.setnames[setcode], cards }))
+    .map(([setcode, cards]) => ({ setcode, name: data.setnames[setcode] ?? guessSetName(data, setcode), cards }))
     .sort((a, b) => b.cards - a.cards || a.name.localeCompare(b.name));
+}
+
+const guessed = new WeakMap<EngineData, Map<number, string>>();
+
+/**
+ * 没有名字的字段：取这个字段所有卡名里都出现的最长一串词（Fairy Tail - Snow、Fairy Tail Ball、
+ * Once Upon a Fairy Tail → Fairy Tail）。找不到时显示字段代码。
+ */
+export function guessSetName(data: EngineData, set: number): string {
+  const cache = guessed.get(data) ?? guessed.set(data, new Map()).get(data)!;
+  const hit = cache.get(set);
+  if (hit) return hit;
+  const names = [...data.cards.values()]
+    .filter((c) => !c.alias && c.data.setcodes.some((s) => (s & 0xfff) === (set & 0xfff) && (s & set) === set))
+    .map((c) => c.name);
+  let best = "";
+  if (names.length) {
+    const lower = names.map((n) => n.toLowerCase());
+    const words = names.reduce((a, b) => (b.length < a.length ? b : a)).split(/\s+/);
+    for (let i = 0; i < words.length; i++) {
+      for (let j = words.length; j > i; j--) {
+        const cand = words.slice(i, j).join(" ").replace(/(\s+(the|of|a|an|and))+$/i, "").replace(/[\s\-–:,"]+$/, "");
+        if (cand.length <= best.length) break;
+        if (lower.every((n) => n.includes(cand.toLowerCase()))) best = cand;
+      }
+    }
+  }
+  const name = best.length >= 3 ? best : `字段 0x${set.toString(16)}`;
+  cache.set(set, name);
+  return name;
 }
 
 /**
