@@ -50,6 +50,8 @@ export const DeckStudy = z.object({
   starters: z.array(Starter).default([]),
   /** 玩家选的重要终端（阻抗怪等）。 */
   keyCards: z.array(CardId).default([]),
+  /** 废件：先后攻都不想抽到的卡，只用来算废件上手率。 */
+  bricks: z.array(CardId).default([]),
   /** 动点 id → 打出来的路线。 */
   routes: z.record(z.string(), Combo).default({}),
   updatedAt: z.string(),
@@ -94,6 +96,7 @@ export function newStudy(name: string, main: number[], extra: number[], format: 
     normalSummon: {},
     starters: [],
     keyCards: [],
+    bricks: [],
     routes: {},
     updatedAt: now.toISOString().slice(0, 10),
   };

@@ -865,3 +865,4 @@ button.slot:disabled { cursor: default; }
   background: var(--accent); color: #fff; border-radius: 0 0 3px 3px;
 }
 .wildcard { display: grid; gap: 8px; padding: 10px; border: 1px dashed var(--line); border-radius: 8px; }
+.study .deck-card.brick .x { background: var(--stop); }

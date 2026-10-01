@@ -10,6 +10,7 @@ import { href, navigate } from "../router";
 import { compareStudy, type StudyComparison } from "../study/compare";
 import { addStarter, newStudy, removeStarter, sameStarter, starterHand, starterProblem, usesNormal, type CardFilter, type DeckStudy, type Starter, type Wildcard } from "../study/model";
 import { ATTRIBUTES, RACES, blankFor, deckArchetypes, deckMatches, filterLabel, matches, practiceMain, starterLabel } from "../study/wildcard";
+import { simulateHands, type HandStats } from "../study/hands";
 import { parseStudies, setStudyTarget, studyStore, useStudies } from "../study/store";
 import { CardView } from "../ui/CardView";
 import { downloadJson } from "../ui/download";
@@ -188,6 +189,17 @@ function StudyDetail({ data, study }: { data: EngineData; study: DeckStudy }) {
   const singles = new Set(study.starters.filter(isSingle).map((s) => s.cards[0]));
   const keys = new Set(study.keyCards);
   const cmp = useMemo(() => compareStudy(study), [study]);
+  const [first, second] = useMemo(() => {
+    const isHandtrap = (id: number) => handtrapById.has(id) || handtrapById.has(data.canonical(id));
+    const cache = new Map<string, boolean>();
+    const wildcardOk = (s: Starter, id: number) => {
+      const k = `${s.id}:${id}`;
+      let v = cache.get(k);
+      if (v === undefined) cache.set(k, (v = !!s.wildcard && matches(data.cards.get(id)!, s.wildcard.filter)));
+      return v;
+    };
+    return [5, 6].map((size) => simulateHands(study, cmp, { size, isHandtrap, wildcardOk }));
+  }, [study, cmp, data]);
   const done = study.starters.filter((s) => study.routes[s.id]).length;
   const label = (s: Starter) => starterLabel(data, s);
 
@@ -199,6 +211,8 @@ function StudyDetail({ data, study }: { data: EngineData; study: DeckStudy }) {
   };
   const toggleKey = (card: number) =>
     update({ ...study, keyCards: keys.has(card) ? study.keyCards.filter((c) => c !== card) : [...study.keyCards, card] });
+  const toggleBrick = (card: number) =>
+    update({ ...study, bricks: study.bricks.includes(card) ? study.bricks.filter((c) => c !== card) : [...study.bricks, card] });
   const toggleNormal = (card: number) =>
     update({ ...study, normalSummon: { ...study.normalSummon, [String(card)]: !usesNormal(study, card) } });
 
@@ -377,7 +391,8 @@ function StudyDetail({ data, study }: { data: EngineData; study: DeckStudy }) {
         )}
       </section>
 
-      <Comparison data={data} study={study} cmp={cmp} />
+      <Comparison data={data} study={study} cmp={cmp} hands={first} />
+      <Rates data={data} study={study} first={first} second={second} onToggleBrick={toggleBrick} label={label} />
     </main>
   );
 }
@@ -518,8 +533,11 @@ function PairPicker({ data, study, cards, onAdd }: { data: EngineData; study: De
   );
 }
 
-function Comparison({ data, study, cmp }: { data: EngineData; study: DeckStudy; cmp: StudyComparison }) {
+function Comparison({ data, study, cmp, hands }: { data: EngineData; study: DeckStudy; cmp: StudyComparison; hands: HandStats | null }) {
   const [open, setOpen] = useState<number | null>(null);
+  // 有起手模拟时按「考虑上手和补点」的分数排
+  const weighted = hands && hands.played > 0 ? hands.weighted : null;
+  const ranked = weighted ? [...cmp.handtraps].sort((a, b) => (weighted[b.handtrap] ?? 0) - (weighted[a.handtrap] ?? 0) || b.score - a.score) : cmp.handtraps;
   if (!cmp.routes.length) {
     return (
       <section className="panel">
@@ -580,10 +598,16 @@ function Comparison({ data, study, cmp }: { data: EngineData; study: DeckStudy; 
       </div>
 
       <h3 className="sub-title">手坑优先级</h3>
+      {weighted && (
+        <p className="muted">
+          按先攻随机起手加权：手里有多个已打过的动点时，按被打后损失最小的那条路线算（另一个动点能补）。百分比是平均打掉的重要终端占比，括号里是只看单条路线的平均。
+        </p>
+      )}
       {cmp.handtraps.length === 0 && <p className="muted">这些路线里没有能打断展开的手坑时点。</p>}
       <ol className="study-rank">
-        {cmp.handtraps.map((h, i) => {
+        {ranked.map((h, i) => {
           const worst = h.hits[0];
+          const score = weighted ? (weighted[h.handtrap] ?? 0) : h.score;
           return (
             <li key={h.handtrap}>
               <button className="rank-row" onClick={() => setOpen(open === h.handtrap ? null : h.handtrap)} aria-expanded={open === h.handtrap}>
@@ -600,9 +624,10 @@ function Comparison({ data, study, cmp }: { data: EngineData; study: DeckStudy; 
                 </span>
                 <span className="rank-score">
                   <span className="prio-bar">
-                    <span style={{ width: pct(h.score) }} />
+                    <span style={{ width: pct(score) }} />
                   </span>
-                  {pct(h.score)}
+                  {pct(score)}
+                  {weighted && <span className="muted">（{pct(h.score)}）</span>}
                 </span>
               </button>
               {open === h.handtrap && (
@@ -648,6 +673,118 @@ function Comparison({ data, study, cmp }: { data: EngineData; study: DeckStudy; 
           </ol>
         </>
       )}
+
+      {cmp.axis.length > 0 && (
+        <>
+          <h3 className="sub-title">卡组的轴（多条路线共同的动作）</h3>
+          <p className="muted">
+            同一个动作出现在越多路线里，越是这副卡的关键动作；能打它的手坑，换哪个动点都躲不掉。
+            {hands && hands.played > 0 && "「绕不开」是先攻起手里手上所有路线都要做这个动作的比例。"}
+          </p>
+          <ol className="study-effects">
+            {cmp.axis.slice(0, 10).map((a) => (
+              <li key={a.sig}>
+                <span className="thumb">
+                  <CardView id={a.card} name={data.name(a.card)} />
+                </span>
+                <span className="rank-text">
+                  <strong>{a.label}</strong>
+                  <span className="muted">
+                    {a.routes.length} / {total} 条路线
+                    {hands && hands.played > 0 && ` · 绕不开 ${pct(hands.unavoidable[a.sig] ?? 0)}`}
+                    {!cmp.fallback || a.keyLoss ? ` · 被无效平均少 ${pct(a.keyLoss)} 重要终端` : ""}
+                    {a.hitBy.length ? ` · 能打它：${a.hitBy.map(htName).join("、")}` : " · 没有手坑能打"}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+    </section>
+  );
+}
+
+function Rates({
+  data,
+  study,
+  first,
+  second,
+  onToggleBrick,
+  label,
+}: {
+  data: EngineData;
+  study: DeckStudy;
+  first: HandStats;
+  second: HandStats;
+  onToggleBrick: (id: number) => void;
+  label: (s: Starter) => string;
+}) {
+  const bricks = new Set(study.bricks);
+  const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
+  const rows: [string, (h: HandStats) => number, string?][] = [
+    ["至少 1 个动点", (h) => h.anyStarter],
+    ["2 个以上不同动点（补点）", (h) => h.multiStarter, "两个不同的动点，用到的卡不重叠"],
+    ["卡手（没有动点）", (h) => 1 - h.anyStarter],
+    ["至少 1 张手坑", (h) => h.handtrap1, "卡组自己放的手坑（Ash Blossom、Maxx \"C\" 等）"],
+    ["2 张以上手坑", (h) => h.handtrap2],
+    ...(study.bricks.length
+      ? ([
+          ["至少 1 张废件", (h) => h.brick1],
+          ["2 张以上废件", (h) => h.brick2],
+        ] as [string, (h: HandStats) => number][])
+      : []),
+  ];
+  return (
+    <section className="panel">
+      <h2 className="section-title">6. 上手率</h2>
+      <p className="muted">
+        按主卡组 {study.main.length} 张随机抽 {first.hands.toLocaleString()} 手统计。先攻起手 5 张，后攻 6 张。
+      </p>
+      <div className="matrix-scroll">
+        <table className="matrix study-routes">
+          <thead>
+            <tr>
+              <th scope="col"></th>
+              <th scope="col">先攻（5 张）</th>
+              <th scope="col">后攻（6 张）</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(([name, get, hint]) => (
+              <tr key={name}>
+                <th scope="row" title={hint}>
+                  {name}
+                </th>
+                <td>{pct(get(first))}</td>
+                <td>{pct(get(second))}</td>
+              </tr>
+            ))}
+            {study.starters.map((s) => (
+              <tr key={s.id}>
+                <th scope="row" className="muted">
+                  动点：{label(s)}
+                </th>
+                <td>{pct(first.perStarter[s.id] ?? 0)}</td>
+                <td>{pct(second.perStarter[s.id] ?? 0)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <h3 className="sub-title">废件</h3>
+      <p className="muted">点卡片标为废件（先后攻都不想抽到的卡），只用来算上面的废件上手率。</p>
+      <div className="deck-grid">
+        {unique(study.main).map((id) => (
+          <button key={id} className={`deck-card${bricks.has(id) ? " active picked brick" : ""}`} onClick={() => onToggleBrick(id)} title={data.name(id)} aria-pressed={bricks.has(id)}>
+            <span className="thumb">
+              <CardView id={id} name={data.name(id)} />
+            </span>
+            {bricks.has(id) && <span className="x">废</span>}
+          </button>
+        ))}
+      </div>
     </section>
   );
 }
