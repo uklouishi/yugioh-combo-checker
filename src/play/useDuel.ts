@@ -2,19 +2,17 @@ import type { OcgCoreSync, OcgResponse } from "ocgcore-wasm";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import type { EngineData } from "../engine/data";
 import { activateAt, loadCore, settle, startDuel, undoResponses } from "../engine/run";
+import { decodeReplay, encodeReplay } from "../engine/replay";
 import type { DuelSession, DuelSetup, Hit } from "../engine/session";
 
 const RESUME_KEY = "play-resume-v1";
 
-/** 当前对局存到 sessionStorage（同一个标签页里去分析页再回来时接着打）。bigint 存成 {$big}。 */
+/** 当前对局存到 sessionStorage（同一个标签页里去分析页再回来时接着打）。 */
 function remember(s: Pick<DuelSession, "setup" | "responses"> | null) {
   try {
     if (!s) sessionStorage.removeItem(RESUME_KEY);
     else
-      sessionStorage.setItem(
-        RESUME_KEY,
-        JSON.stringify({ setup: s.setup, responses: s.responses }, (_, v) => (typeof v === "bigint" ? { $big: v.toString() } : v)),
-      );
+      sessionStorage.setItem(RESUME_KEY, encodeReplay({ setup: s.setup, responses: s.responses }));
   } catch {
     // 存储不可用时不影响对局
   }
@@ -27,8 +25,7 @@ export const queueDuel = (setup: DuelSetup) => remember({ setup, responses: [] }
 export function savedDuel(): { setup: DuelSetup; responses: OcgResponse[] } | null {
   try {
     const raw = sessionStorage.getItem(RESUME_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw, (_, v) => (v && typeof v === "object" && typeof v.$big === "string" ? BigInt(v.$big) : v));
+    return raw ? decodeReplay(raw) : null;
   } catch {
     return null;
   }

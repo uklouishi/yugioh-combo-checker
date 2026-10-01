@@ -7,7 +7,7 @@
  * - 「绕不开的动作」：一手里所有能用的路线都要做这个动作，打它就躲不掉。
  */
 import type { StudyComparison } from "./compare";
-import type { DeckStudy, Starter } from "./model";
+import type { DeckStudy, Recovery, Starter } from "./model";
 
 export interface HandOptions {
   /** 起手张数：先攻 5，后攻 6。 */
@@ -106,6 +106,8 @@ export function simulateHands(study: DeckStudy, cmp: StudyComparison, opts: Hand
   const weighted: Record<number, number> = {};
   const unavoidable: Record<string, number> = {};
   const outcomes: Record<number, HandtrapOutcome> = {};
+  const recoveries = new Map<string, Recovery[]>();
+  for (const rec of study.recoveries) if (rec.ok) recoveries.set(`${rec.starterId}|${rec.sig}`, [...(recoveries.get(`${rec.starterId}|${rec.sig}`) ?? []), rec]);
 
   for (let k = 0; k < n; k++) {
     // 部分洗牌：只洗出前 size 张
@@ -140,26 +142,32 @@ export function simulateHands(study: DeckStudy, cmp: StudyComparison, opts: Hand
     const played = avail.map((a) => routes.get(a.s.id)).filter((r): r is NonNullable<typeof r> => !!r && r.keyEnd.length > 0);
     if (!played.length) continue;
     c.played++;
-    // 每条路线能接上的补点：卡不重叠，两边不都用通常召唤
+    // 每条路线能接上的补点：卡不重叠（通常召唤冲突按被打的时机再看）
     const playable = avail.filter((a) => played.some((r) => r.starter.id === a.s.id));
+    const usedBy = new Map(playable.map((a) => [a.s.id, a.used]));
     const backups = new Map(
-      playable.map((a) => {
-        const ra = routes.get(a.s.id)!;
-        const bs = playable
-          .filter((b) => b.s.id !== a.s.id && !(ra.normalSummon && routes.get(b.s.id)!.normalSummon) && useStarter(b.s, hand, opts.wildcardOk, a.used))
-          .map((b) => routes.get(b.s.id)!);
-        return [a.s.id, bs];
-      }),
+      playable.map((a) => [
+        a.s.id,
+        playable.filter((b) => b.s.id !== a.s.id && useStarter(b.s, hand, opts.wildcardOk, a.used)).map((b) => routes.get(b.s.id)!),
+      ]),
     );
     const baseline = Math.max(...played.map((r) => r.keyEnd.length));
     for (const h of cmp.handtraps) {
       let after = 0;
       for (const r of played) {
         const options = h.options[r.starter.id] ?? [];
+        const used = usedBy.get(r.starter.id)!;
         let worst = r.keyEnd.length;
         for (const o of options) {
+          // 被打之前已经通常召唤过，补点就不能再通召
+          const nsUsed = r.nsStep >= 0 && r.nsStep <= (r.sigStep[o.sig] ?? Infinity);
           let best = r.keyEnd.length - o.keyLost;
-          for (const b of backups.get(r.starter.id) ?? []) best = Math.max(best, b.keyEnd.length - (b.sigLoss[o.sig] ?? 0));
+          for (const b of backups.get(r.starter.id) ?? []) if (!(nsUsed && b.normalSummon)) best = Math.max(best, b.keyEnd.length - (b.sigLoss[o.sig] ?? 0));
+          // 玩家确认过的续打：手里另有那张卡（不是这个动点用掉的），就能续上
+          for (const rec of recoveries.get(`${r.starter.id}|${o.sig}`) ?? []) {
+            if (nsUsed && rec.line.some((l) => l.startsWith("通常召唤"))) continue;
+            if (hand.some((x, j) => x === rec.card && !used.has(j))) best = r.keyEnd.length;
+          }
           worst = Math.min(worst, best);
         }
         after = Math.max(after, worst);
