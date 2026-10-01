@@ -8,6 +8,7 @@ const MENU = [
   { to: href.open(), label: "打开 combo", frame: "link" },
   { to: href.create(), label: "创建 combo", frame: "spell" },
   { to: href.analyze(), label: "分析手坑", frame: "trap" },
+  { to: href.study(), label: "卡组研究", frame: "fusion" },
 ];
 
 const HOW_TO = [

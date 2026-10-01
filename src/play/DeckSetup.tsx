@@ -45,6 +45,23 @@ function save(s: Saved) {
   }
 }
 
+/**
+ * 用练习页记住的对手设置（手坑、Harmonia 送墓的同调）拼出一局的设置。
+ * 卡组研究页从这里进练习，对手和平时练习时一样。
+ */
+export function practiceSetup(data: EngineData, deck: { main: number[]; extra: number[]; hand: number[] | null; format: Format }): DuelSetup {
+  const saved = load();
+  const legal = (id: number) => data.limit(deck.format, id) > 0;
+  const opponent = (saved?.opponent ?? DEFAULT_OPPONENT).filter(legal);
+  const synchro = saved?.synchro ?? MALONG;
+  return {
+    ...deck,
+    opponentHand: opponent,
+    ...(opponent.includes(HARMONIA) && { opponentExtra: [synchro, ...Array(4).fill(GAIA_KNIGHT)], opponentSynchro: synchro }),
+    seed: Math.floor(Math.random() * 2 ** 31),
+  };
+}
+
 interface Props {
   data: EngineData;
   onStart: (setup: DuelSetup) => void;
@@ -143,15 +160,7 @@ export function DeckSetup({ data, onStart }: Props) {
   const canStart = !!deck && deck.main.length > 0 && (mode === "random" || validHand.length > 0);
   const start = () => {
     if (!deck) return;
-    onStart({
-      main: deck.main,
-      extra: deck.extra,
-      hand: mode === "pick" ? validHand : null,
-      opponentHand: opponent.filter(legal),
-      ...(harmonia && { opponentExtra: [synchro, ...Array(4).fill(GAIA_KNIGHT)], opponentSynchro: synchro }),
-      format,
-      seed: Math.floor(Math.random() * 2 ** 31),
-    });
+    onStart(practiceSetup(data, { main: deck.main, extra: deck.extra, hand: mode === "pick" ? validHand : null, format }));
   };
 
   const mainCounts = deck ? [...count(deck.main)] : [];

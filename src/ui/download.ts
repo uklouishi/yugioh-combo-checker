@@ -1,16 +1,19 @@
 import { toBlob } from "html-to-image";
 import type { Combo } from "../model/schema";
 
-/** 把 combo 下载成 JSON 文件。 */
-export function downloadCombo(combo: Combo) {
-  const blob = new Blob([JSON.stringify(combo, null, 2) + "\n"], { type: "application/json" });
+/** 把任意数据下载成 JSON 文件。 */
+export function downloadJson(data: unknown, filename: string) {
+  const blob = new Blob([JSON.stringify(data, null, 2) + "\n"], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `${combo.id}.json`;
+  a.download = filename;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/** 把 combo 下载成 JSON 文件。 */
+export const downloadCombo = (combo: Combo) => downloadJson(combo, `${combo.id}.json`);
 
 /**
  * 把页面上的一块区域导出成 PNG 下载。带 no-export 的元素（按钮等）不会出现在图里。

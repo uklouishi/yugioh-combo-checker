@@ -1,4 +1,4 @@
-/** 极简 hash 路由：#/、#/play、#/open、#/create、#/edit/<id>、#/view/<id>[/<step>]、#/analyze/<id>。 */
+/** 极简 hash 路由：#/、#/play、#/open、#/create、#/edit/<id>、#/view/<id>[/<step>]、#/analyze/<id>、#/study[/<id>]。 */
 import { useEffect, useState } from "react";
 
 export type Route =
@@ -8,7 +8,8 @@ export type Route =
   | { page: "create" }
   | { page: "edit"; id: string }
   | { page: "view"; id: string; step: number }
-  | { page: "analyze"; id?: string };
+  | { page: "analyze"; id?: string }
+  | { page: "study"; id?: string };
 
 export function parseHash(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
@@ -25,6 +26,8 @@ export function parseHash(hash: string): Route {
       return parts[1] ? { page: "view", id: parts[1], step: Number(parts[2]) || 0 } : { page: "open" };
     case "analyze":
       return { page: "analyze", id: parts[1] };
+    case "study":
+      return { page: "study", id: parts[1] };
     default:
       return { page: "home" };
   }
@@ -38,6 +41,7 @@ export const href = {
   edit: (id: string) => `#/edit/${encodeURIComponent(id)}`,
   view: (id: string, step = 0) => `#/view/${encodeURIComponent(id)}${step ? `/${step}` : ""}`,
   analyze: (id?: string) => (id ? `#/analyze/${encodeURIComponent(id)}` : "#/analyze"),
+  study: (id?: string) => (id ? `#/study/${encodeURIComponent(id)}` : "#/study"),
 };
 
 export function navigate(to: string) {

@@ -472,6 +472,7 @@ textarea { width: 100%; min-height: 72px; resize: vertical; }
 .mini-card.f-link { background: linear-gradient(160deg, #3f87d8, #1d4b85); }
 .mini-card.f-spell { background: linear-gradient(160deg, #25a085, #13695a); }
 .mini-card.f-trap { background: linear-gradient(160deg, #b8508a, #7a2658); }
+.mini-card.f-fusion { background: linear-gradient(160deg, #a174c8, #5f3a85); }
 
 .how-to { position: relative; display: grid; justify-items: center; }
 .help-btn {
@@ -639,7 +640,7 @@ button.slot:disabled { cursor: default; }
 /* Fydraulis Harmonia 的同调怪兽设置 */
 .harmonia { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--accent); border-radius: 8px; display: grid; gap: 8px; }
 .harmonia p { margin: 0; }
-.harmonia .field { display: grid; gap: 4px; max-width: 420px; }
+.harmonia .field, .study-field { display: grid; gap: 4px; max-width: 420px; }
 .harmonia input { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: inherit; }
 
 /* 练习：拖拽出牌、卡上按钮、悬浮选择窗 */
@@ -822,3 +823,40 @@ button.slot:disabled { cursor: default; }
 .field-wrap .mat { width: min(100%, max(340px, calc(100vh - 360px))); }
 .step-panel .mini.anim-toggle { border: 1px solid var(--line); border-radius: 6px; font-size: 12px; white-space: nowrap; }
 .step-panel .mini.anim-toggle.on { border-color: var(--glow); color: var(--accent); }
+
+/* 卡组研究 */
+.study .deck-card.picked .x { background: var(--accent); color: #fff; }
+.study details summary { cursor: pointer; }
+.study details[open] summary { margin-bottom: 8px; }
+.sub-title { font: 700 15px/1.4 var(--display); margin: 8px 0 0; }
+.study-banner { justify-content: space-between; }
+.starter-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.starter-list > li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px;
+  border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 0 8px 8px 0; padding: 8px 12px;
+}
+.starter-list > li.done { border-left-color: var(--accent); }
+.starter-list .hand { display: flex; gap: 4px; flex: none; }
+.starter-list .thumb, .key-thumbs .thumb, .study-rank .thumb, .study-effects .thumb { position: relative; display: block; width: 34px; aspect-ratio: 59 / 86; flex: none; }
+.starter-list .thumb .placeholder > *, .key-thumbs .thumb .placeholder > *, .study-rank .thumb .placeholder > *, .study-effects .thumb .placeholder > * { display: none; }
+.starter-list .info { flex: 1 1 240px; min-width: 0; display: grid; gap: 4px; }
+.ns-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.study-routes td, .study-routes th { text-align: left; padding-inline: 10px; }
+.key-thumbs { display: flex; flex-wrap: wrap; gap: 3px; }
+.key-thumbs .thumb { width: 26px; }
+.study-rank, .study-effects { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.rank-row {
+  width: 100%; display: grid; grid-template-columns: 26px 34px minmax(0, 1fr) auto; gap: 10px; align-items: center; text-align: left;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; --c: var(--accent);
+}
+.rank-row:hover { border-color: var(--accent); }
+.rank-text { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.rank-score { display: grid; gap: 2px; justify-items: end; font: 700 13px var(--mono); }
+.study-rank li:first-child .rank-row { --c: var(--stop); }
+.rank-detail { margin: 6px 0 4px 36px; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 13px; }
+.rank-detail .muted { display: block; font-size: 12px; }
+.study-effects li { display: flex; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
+@media (max-width: 560px) {
+  .rank-row { grid-template-columns: 22px 30px minmax(0, 1fr); }
+  .rank-score { grid-column: 3; justify-items: start; grid-template-columns: auto auto; align-items: center; gap: 8px; }
+}
