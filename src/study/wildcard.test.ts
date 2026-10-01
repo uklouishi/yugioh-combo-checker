@@ -77,6 +77,15 @@ describe("通配卡", () => {
     expect(sets.find((a) => a.setcode === SNAKE_EYE_SET)).toMatchObject({ name: "Snake-Eye", cards: 2 });
   });
 
+  it("引擎字段表里没有名字的字段也列出来，名字从卡名里找", () => {
+    const SNOW = 55623480; // Fairy Tail - Snow（字段 0x1d2，strings.conf 里没有名字）
+    const LUNA = 86937530; // Fairy Tail - Luna
+    const sets = deckArchetypes(data, [SNOW, SNOW, LUNA, ...Array(37).fill(ASH_BLOSSOM)]);
+    expect(sets.find((a) => a.setcode === 0x1d2)).toMatchObject({ name: "Fairy Tail", cards: 3 });
+    const s = newStudy("x", [SNOW, LUNA, ...Array(38).fill(ASH_BLOSSOM)], [], "tcg");
+    expect(deckMatches(data, s, { setcode: 0x1d2 })).toEqual([SNOW, LUNA]);
+  });
+
   it("按字段筛选：只选字段时魔法也算，加了种族就只要怪兽", () => {
     const s = newStudy("x", [DARK_MAGICIAN, DMG, SE_ASH, SPOILS, ...Array(36).fill(ASH_BLOSSOM)], [], "tcg");
     expect(deckMatches(data, s, { setcode: DARK_MAGICIAN_SET })).toEqual([DARK_MAGICIAN, DMG]);
