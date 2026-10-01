@@ -62,6 +62,15 @@ export const Recovery = z.object({
 });
 export type Recovery = z.infer<typeof Recovery>;
 
+/** 重要终端要在哪里才算达成。 */
+export const KeyZone = z.enum(["field", "gy", "banished", "material"]);
+export type KeyZone = z.infer<typeof KeyZone>;
+/** 1 优先、2 高优先、3 最高优先。 */
+export const KeyPriority = z.union([z.literal(1), z.literal(2), z.literal(3)]);
+export type KeyPriority = z.infer<typeof KeyPriority>;
+export const KeyTarget = z.object({ zone: KeyZone.default("field"), priority: KeyPriority.default(1) });
+export type KeyTarget = z.infer<typeof KeyTarget>;
+
 export const DeckStudy = z.object({
   id: z.string(),
   name: z.string(),
@@ -73,6 +82,8 @@ export const DeckStudy = z.object({
   starters: z.array(Starter).default([]),
   /** 玩家选的重要终端（阻抗怪等）。 */
   keyCards: z.array(CardId).default([]),
+  /** 卡号 → 重要终端的条件（在哪个区域、优先级）。没写的是场上、优先。 */
+  keyTargets: z.record(z.string(), KeyTarget).default({}),
   /** 废件：先后攻都不想抽到的卡，只用来算废件上手率。 */
   bricks: z.array(CardId).default([]),
   /** side 卡组。 */
@@ -133,6 +144,7 @@ export function newStudy(name: string, main: number[], extra: number[], format: 
     normalSummon: {},
     starters: [],
     keyCards: [],
+    keyTargets: {},
     bricks: [],
     side,
     breakers: [],

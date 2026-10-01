@@ -8,9 +8,10 @@ import { SAMPLE_DECK } from "../play/sample";
 import { queueDuel } from "../play/useDuel";
 import { href, navigate } from "../router";
 import { compareStudy, type StudyComparison } from "../study/compare";
-import { addStarter, newStudy, removeStarter, sameStarter, sidedMain, sideProblem, starterHand, starterProblem, usesNormal, type SidePlan, type CardFilter, type DeckStudy, type Starter, type Wildcard } from "../study/model";
+import { addStarter, newStudy, removeStarter, sameStarter, sidedMain, sideProblem, starterHand, starterProblem, usesNormal, type SidePlan, type CardFilter, type DeckStudy, type Starter, type Wildcard, type KeyZone } from "../study/model";
 import { ATTRIBUTES, RACES, blankFor, deckArchetypes, deckMatches, filterLabel, matches, practiceMain, starterLabel } from "../study/wildcard";
 import { simulateHands, type HandOptions, type HandStats, type HandtrapOutcome } from "../study/hands";
+import { cycleKey, keyTarget, PRIORITY_LABEL, setKeyZone, ZONE_LABEL, ZONE_SHORT } from "../study/endboard";
 import { parseStudies, setStudyTarget, studyStore, useStudies } from "../study/store";
 import { CardView } from "../ui/CardView";
 import { downloadJson } from "../ui/download";
@@ -346,7 +347,7 @@ function StudyDetail({ data, study }: { data: EngineData; study: DeckStudy }) {
                         <div className="muted">
                           已打：{route.steps.length} 步，终场 {summary.endCount} 张
                           {!cmp.fallback &&
-                            (summary.keyEnd.length ? `，重要终端 ${summary.keyEnd.map((c) => data.name(c)).join("、")}` : "，没打出重要终端")}
+                            (summary.keyShown.length ? `，重要终端 ${summary.keyShown.map((c) => data.name(c)).join("、")}` : "，没打出重要终端")}
                         </div>
                       ) : (
                         <div className="muted">还没打</div>
@@ -559,7 +560,8 @@ function Comparison({
     return s ? starterLabel(data, s) : "";
   };
   const htName = (id: number) => handtrapById.get(id)?.name ?? data.name(id);
-  const names = (ids: number[]) => ids.map((c) => data.name(c)).join("、");
+  // 重要终端按优先级重复列了几次，显示时去重
+  const names = (ids: number[]) => [...new Set(ids)].map((c) => data.name(c)).join("、");
   const pct = (x: number) => `${Math.round(x * 100)}%`;
   const total = cmp.routes.length;
 
@@ -591,12 +593,12 @@ function Comparison({
                 <td>{r.combo.steps.length}</td>
                 <td className="key-cell">
                   <div className="key-thumbs">
-                    {r.keyEnd.map((c, i) => (
+                    {r.keyShown.map((c, i) => (
                       <span key={i} className="thumb" title={data.name(c)}>
                         <CardView id={c} name={data.name(c)} />
                       </span>
                     ))}
-                    {!r.keyEnd.length && <span className="muted">无</span>}
+                    {!r.keyShown.length && <span className="muted">无</span>}
                   </div>
                 </td>
               </tr>
@@ -762,7 +764,7 @@ function Marks({ data, study, handtraps, onChange }: { data: EngineData; study: 
   const extraCards = unique(study.extra);
   const sideOnly = unique(study.side).filter((id) => !study.main.includes(id));
   const toggle = (id: number) => {
-    if (mode === "key") onChange({ ...study, keyCards: keys.has(id) ? study.keyCards.filter((c) => c !== id) : [...study.keyCards, id] });
+    if (mode === "key") onChange(cycleKey(study, id));
     else if (mode === "handtrap") {
       const list = [...handtraps];
       onChange({ ...study, handtraps: handtraps.has(id) ? list.filter((c) => c !== id) : [...list, id] });
@@ -770,12 +772,19 @@ function Marks({ data, study, handtraps, onChange }: { data: EngineData; study: 
   };
   const card = (id: number) => {
     const tags: [MarkMode, string][] = [];
-    if (keys.has(id)) tags.push(["key", "终端"]);
+    if (keys.has(id)) tags.push(["key", mode === "key" ? PRIORITY_LABEL[keyTarget(study, id).priority] : "终端"]);
     if (handtraps.has(id)) tags.push(["handtrap", "手坑"]);
     if (breakers.has(id)) tags.push(["breaker", "解牌"]);
     const on = tags.some(([m]) => m === mode);
-    return (
-      <button key={id} className={`deck-card mark-card${on ? ` on ${mode}` : ""}`} onClick={() => toggle(id)} title={data.name(id)} aria-pressed={on}>
+    const target = keyTarget(study, id);
+    const tile = (
+      <button
+        key={id}
+        className={`deck-card mark-card${on ? ` on ${mode}` : ""}${on && mode === "key" ? ` p${target.priority}` : ""}`}
+        onClick={() => toggle(id)}
+        title={data.name(id)}
+        aria-pressed={on}
+      >
         <span className="thumb">
           <CardView id={id} name={data.name(id)} />
         </span>
@@ -790,6 +799,19 @@ function Marks({ data, study, handtraps, onChange }: { data: EngineData; study: 
         )}
       </button>
     );
+    if (!(on && mode === "key")) return tile;
+    return (
+      <div key={id} className="mark-key">
+        {tile}
+        <select value={target.zone} onChange={(e) => onChange(setKeyZone(study, id, e.target.value as KeyZone))} aria-label={`${data.name(id)} 在哪里算达成`}>
+          {(Object.keys(ZONE_LABEL) as KeyZone[]).map((z) => (
+            <option key={z} value={z} title={`${ZONE_LABEL[z]}有这张卡才算达成`}>
+              {ZONE_SHORT[z]}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
   };
   const modes: [MarkMode, string][] = [
     ["key", `重要终端（${study.keyCards.length}）`],
@@ -800,7 +822,8 @@ function Marks({ data, study, handtraps, onChange }: { data: EngineData; study: 
     <section className="panel">
       <h2 className="section-title">3. 标记卡片类型</h2>
       <p className="muted">
-        先选要标哪一类，再点卡。<span className="mark-tag key">终端</span> 是这副卡最想留在场上的卡（Baronne、Apollousa 这类阻抗），对比时只数这些卡；
+        先选要标哪一类，再点卡。<span className="mark-tag key">终端</span> 是这副卡回合结束时最想有的卡（Baronne、Apollousa 这类阻抗），对比时只数这些卡。
+        重复点同一张卡切换 优先 → 高优先 → 最高优先 → 取消，对比时高优先算 2 张、最高优先算 3 张；卡下面可以选它要在场上、墓地、除外，还是作为超量素材才算达成；
         <span className="mark-tag handtrap">手坑</span> 是 Ash Blossom、Nibiru 这类对手回合从手里用的卡；
         <span className="mark-tag breaker">解牌</span> 是 Super Polymerization、Lava Golem 这类后攻破场的卡。
         {!study.handtraps && " 手坑已按网站的手坑表预选，请检查。"}

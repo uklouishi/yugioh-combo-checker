@@ -190,6 +190,10 @@ export const Combo = z.object({
   endboard: z.object({
     cards: z.array(CardRef),
     description: z.string(),
+    /** 回合结束时墓地、除外区里的卡，和挂在超量怪兽下面的素材。旧路线没有，按 moves 推算。 */
+    grave: z.array(CardRef).optional(),
+    banished: z.array(CardRef).optional(),
+    materials: z.array(CardRef).optional(),
   }),
   /** 数据来源 / 参考链接，以及可信度说明。 */
   sources: z.array(z.string()).default([]),

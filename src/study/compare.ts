@@ -15,14 +15,17 @@ import { HT } from "../model/interruptions";
 import type { Combo, StepAction } from "../model/schema";
 import { EFFECT_LABEL, KIND_LABEL, METHOD_LABEL } from "../editor/labels";
 import type { DeckStudy, Starter } from "./model";
+import { keyCardsMet, weighted } from "./endboard";
 
 const DRAWERS = new Set<number>([HT.MAXX_C, FUWALOS, PURULIA, MEOWLS]);
 
 export interface RouteSummary {
   starter: Starter;
   combo: Combo;
-  /** 终场里的重要终端（同名多张就列多次）。 */
+  /** 终场达成的重要终端，按优先级加权（高优先列 2 次、最高优先列 3 次），占比都按它算。 */
   keyEnd: number[];
+  /** 终场达成的重要终端，不加权，显示用（同名多张就列多次）。 */
+  keyShown: number[];
   endCount: number;
   normalSummon: boolean;
   /** 路线里做过的动作（见 actionSig），去重。 */
@@ -141,16 +144,17 @@ function actorOf(combo: Combo, i: number): number {
 
 export function compareStudy(study: DeckStudy): StudyComparison {
   const fallback = study.keyCards.length === 0;
-  const key = new Set(study.keyCards);
   const routes: RouteSummary[] = study.starters.flatMap((starter) => {
     const combo = study.routes[starter.id];
     if (!combo) return [];
     const end = combo.endboard.cards.map((c) => c.id);
+    const met = fallback ? end : keyCardsMet(study, combo);
     return [
       {
         starter,
         combo,
-        keyEnd: fallback ? end : end.filter((c) => key.has(c)),
+        keyEnd: fallback ? end : weighted(study, met),
+        keyShown: met,
         endCount: end.length,
         normalSummon: combo.steps.some((s) => s.actions.some((a) => a.type === "summon" && a.summon.method === "normal")),
         sigs: [...new Set(combo.steps.flatMap((s) => s.actions.map(actionSig)))],

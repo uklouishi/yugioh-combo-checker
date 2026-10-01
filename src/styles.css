@@ -930,3 +930,8 @@ button.slot:disabled { cursor: default; }
 .mark-seg label.on.key { background: var(--mark-key); }
 .mark-seg label.on.handtrap { background: var(--mark-handtrap); }
 .mark-seg label.on.breaker { background: var(--mark-breaker); }
+/* 重要终端：优先级越高边框越粗，卡下面选在哪个区域算达成 */
+.study .mark-card.on.key.p2 { box-shadow: 0 0 0 3px var(--c), 0 0 0 5px var(--surface), 0 0 0 7px var(--c); }
+.study .mark-card.on.key.p3 { box-shadow: 0 0 0 3px var(--c), 0 0 10px 4px var(--c); }
+.mark-key { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mark-key select { width: 100%; min-width: 0; font-size: 11px; padding: 1px 2px; }
