@@ -41,5 +41,15 @@ export const SAMPLE_DECK: Deck = {
     58071334, // Snake-Eyes Doomed Dragon
     50277355, // Cross-Sheep
   ],
-  side: [],
+  side: [
+    48130397, // Super Polymerization
+    102380, // Lava Golem
+    ...n(54693926, 2), // Dark Ruler No More
+    ...n(15693423, 2), // Evenly Matched
+    24299458, // Forbidden Droplet
+    ...n(27204311, 2), // Nibiru, the Primal Being
+    ...n(94145021, 2), // Droll & Lock Bird
+    ...n(73642296, 2), // Ghost Belle & Haunted Mansion
+    ...n(59438930, 2), // Ghost Ogre & Snow Rabbit
+  ],
 };

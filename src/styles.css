@@ -866,3 +866,17 @@ button.slot:disabled { cursor: default; }
 }
 .wildcard { display: grid; gap: 8px; padding: 10px; border: 1px dashed var(--line); border-radius: 8px; }
 .study .deck-card.brick .x { background: var(--stop); }
+.study .deck-card.picked .x.breaker { background: #b7791f; color: #fff; }
+.side-grid { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); }
+.side-card { display: grid; gap: 3px; }
+.side-card .role-tag {
+  position: absolute; left: 2px; top: 2px; z-index: 2;
+  font: 500 10px var(--mono); background: rgba(0, 0, 0, 0.75); color: #fff; padding: 0 4px; border-radius: 3px;
+}
+.side-count { display: flex; align-items: center; justify-content: space-between; font: 500 11px var(--mono); }
+.side-count .mini { padding: 0 6px; min-width: 20px; }
+.side-import { display: grid; gap: 6px; }
+.side-import textarea { width: 100%; font: 12px/1.5 var(--mono); }
+.side-table .delta { font-family: var(--mono); }
+.side-table .delta.up { color: #3c9a4a; }
+.side-table .delta.down { color: var(--stop); }

@@ -8,9 +8,9 @@ import { SAMPLE_DECK } from "../play/sample";
 import { queueDuel } from "../play/useDuel";
 import { href, navigate } from "../router";
 import { compareStudy, type StudyComparison } from "../study/compare";
-import { addStarter, newStudy, removeStarter, sameStarter, starterHand, starterProblem, usesNormal, type CardFilter, type DeckStudy, type Starter, type Wildcard } from "../study/model";
+import { addStarter, newStudy, removeStarter, sameStarter, sidedMain, sideProblem, starterHand, starterProblem, usesNormal, type SidePlan, type CardFilter, type DeckStudy, type Starter, type Wildcard } from "../study/model";
 import { ATTRIBUTES, RACES, blankFor, deckArchetypes, deckMatches, filterLabel, matches, practiceMain, starterLabel } from "../study/wildcard";
-import { simulateHands, type HandStats } from "../study/hands";
+import { simulateHands, type HandOptions, type HandStats } from "../study/hands";
 import { parseStudies, setStudyTarget, studyStore, useStudies } from "../study/store";
 import { CardView } from "../ui/CardView";
 import { downloadJson } from "../ui/download";
@@ -72,7 +72,12 @@ function StudyList({ data, studies }: { data: EngineData; studies: DeckStudy[] }
         const c = data.cards.get(id);
         if (c) (isExtraDeckCard(c) ? extra : main).push(id);
       }
-      return { deck: { main, extra }, error: main.length ? null : "主卡组是空的" };
+      // side 里额外卡组的卡不影响起手，只留主卡组的卡
+      const side = d.side.filter((id) => {
+        const c = data.cards.get(id);
+        return !!c && !isExtraDeckCard(c);
+      });
+      return { deck: { main, extra, side }, error: main.length ? null : "主卡组是空的" };
     } catch (e) {
       return { deck: null, error: e instanceof DeckParseError ? e.message : "读取失败" };
     }
@@ -80,7 +85,7 @@ function StudyList({ data, studies }: { data: EngineData; studies: DeckStudy[] }
 
   const create = () => {
     if (!parsed.deck) return;
-    const s = newStudy(name.trim() || "未命名卡组", parsed.deck.main, parsed.deck.extra, format);
+    const s = newStudy(name.trim() || "未命名卡组", parsed.deck.main, parsed.deck.extra, format, new Date(), parsed.deck.side);
     studyStore.save(s);
     navigate(href.study(s.id));
   };
@@ -169,7 +174,7 @@ function StudyList({ data, studies }: { data: EngineData; studies: DeckStudy[] }
         {parsed.error && <p className="errors-inline">{parsed.error}</p>}
         {parsed.deck && !parsed.error && (
           <p className="muted">
-            主卡组 {parsed.deck.main.length} 张 · 额外卡组 {parsed.deck.extra.length} 张
+            主卡组 {parsed.deck.main.length} 张 · 额外卡组 {parsed.deck.extra.length} 张 · side {parsed.deck.side.length} 张
           </p>
         )}
         <div className="start-row">
@@ -189,17 +194,22 @@ function StudyDetail({ data, study }: { data: EngineData; study: DeckStudy }) {
   const singles = new Set(study.starters.filter(isSingle).map((s) => s.cards[0]));
   const keys = new Set(study.keyCards);
   const cmp = useMemo(() => compareStudy(study), [study]);
-  const [first, second] = useMemo(() => {
-    const isHandtrap = (id: number) => handtrapById.has(id) || handtrapById.has(data.canonical(id));
+  const htSet = useMemo(() => new Set(roleHandtraps(data, study)), [data, study]);
+  const handOpts = useMemo(() => {
     const cache = new Map<string, boolean>();
-    const wildcardOk = (s: Starter, id: number) => {
-      const k = `${s.id}:${id}`;
-      let v = cache.get(k);
-      if (v === undefined) cache.set(k, (v = !!s.wildcard && matches(data.cards.get(id)!, s.wildcard.filter)));
-      return v;
+    const breakers = new Set(study.breakers);
+    return {
+      isHandtrap: (id: number) => htSet.has(id),
+      isBreaker: (id: number) => breakers.has(id),
+      wildcardOk: (s: Starter, id: number) => {
+        const k = `${s.id}:${id}`;
+        let v = cache.get(k);
+        if (v === undefined) cache.set(k, (v = !!s.wildcard && matches(data.cards.get(id)!, s.wildcard.filter)));
+        return v;
+      },
     };
-    return [5, 6].map((size) => simulateHands(study, cmp, { size, isHandtrap, wildcardOk }));
-  }, [study, cmp, data]);
+  }, [study, htSet, data]);
+  const [first, second] = useMemo(() => [5, 6].map((size) => simulateHands(study, cmp, { size, ...handOpts })), [study, cmp, handOpts]);
   const done = study.starters.filter((s) => study.routes[s.id]).length;
   const label = (s: Starter) => starterLabel(data, s);
 
@@ -392,7 +402,9 @@ function StudyDetail({ data, study }: { data: EngineData; study: DeckStudy }) {
       </section>
 
       <Comparison data={data} study={study} cmp={cmp} hands={first} />
+      <Roles data={data} study={study} handtraps={htSet} onChange={update} />
       <Rates data={data} study={study} first={first} second={second} onToggleBrick={toggleBrick} label={label} />
+      <SideSim data={data} study={study} cmp={cmp} base={{ first, second }} handOpts={handOpts} onChange={update} label={label} />
     </main>
   );
 }
@@ -705,6 +717,305 @@ function Comparison({ data, study, cmp, hands }: { data: EngineData; study: Deck
   );
 }
 
+const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
+
+type RateRow = [name: string, get: (h: HandStats) => number, hint?: string];
+
+/** 上手率表的行：动点、手坑、解牌、废件。换 side 对比也用同一套。 */
+function rateRows(study: DeckStudy): RateRow[] {
+  return [
+    ["至少 1 个动点", (h) => h.anyStarter],
+    ["2 个以上不同动点（补点）", (h) => h.multiStarter, "两个不同的动点，用到的卡不重叠"],
+    ["卡手（没有动点）", (h) => 1 - h.anyStarter],
+    ["至少 1 张手坑", (h) => h.handtrap1, "第 6 步标为手坑的卡"],
+    ["2 张以上手坑", (h) => h.handtrap2],
+    ...(study.breakers.length
+      ? ([
+          ["至少 1 张解牌", (h) => h.breaker1, "第 6 步标为解牌的卡，后攻破场用"],
+          ["2 张以上解牌", (h) => h.breaker2],
+          ["至少 1 张手坑或解牌", (h) => h.interaction, "后攻时手里至少有一张能干扰或破场的卡"],
+        ] as RateRow[])
+      : []),
+    ...(study.bricks.length
+      ? ([
+          ["至少 1 张废件", (h) => h.brick1],
+          ["2 张以上废件", (h) => h.brick2],
+        ] as RateRow[])
+      : []),
+  ];
+}
+
+/** 卡组（含 side）里的手坑：玩家标过就用玩家的，没标过按网站的手坑表推荐。 */
+function roleHandtraps(data: EngineData, study: DeckStudy): number[] {
+  if (study.handtraps) return study.handtraps;
+  return unique([...study.main, ...study.side]).filter((id) => handtrapById.has(id) || handtrapById.has(data.canonical(id)));
+}
+
+function Roles({ data, study, handtraps, onChange }: { data: EngineData; study: DeckStudy; handtraps: Set<number>; onChange: (s: DeckStudy) => void }) {
+  const [mode, setMode] = useState<"handtrap" | "breaker">("handtrap");
+  const breakers = new Set(study.breakers);
+  const sideOnly = unique(study.side).filter((id) => !study.main.includes(id));
+  const toggle = (id: number) => {
+    if (mode === "handtrap") {
+      const list = [...handtraps];
+      onChange({ ...study, handtraps: handtraps.has(id) ? list.filter((c) => c !== id) : [...list, id] });
+    } else {
+      onChange({ ...study, breakers: breakers.has(id) ? study.breakers.filter((c) => c !== id) : [...study.breakers, id] });
+    }
+  };
+  const card = (id: number) => {
+    const ht = handtraps.has(id);
+    const bk = breakers.has(id);
+    const on = mode === "handtrap" ? ht : bk;
+    return (
+      <button key={id} className={`deck-card${on ? " active picked" : ""}${ht || bk ? " role" : ""}`} onClick={() => toggle(id)} title={data.name(id)} aria-pressed={on}>
+        <span className="thumb">
+          <CardView id={id} name={data.name(id)} />
+        </span>
+        {(ht || bk) && <span className={`x${bk && !ht ? " breaker" : ""}`}>{ht && bk ? "坑/解" : ht ? "坑" : "解"}</span>}
+      </button>
+    );
+  };
+  return (
+    <section className="panel">
+      <h2 className="section-title">6. 手坑和解牌</h2>
+      <p className="muted">
+        标出卡组和 side 里的手坑（Ash Blossom、Nibiru 这类对手回合从手里用的卡）和解牌（Super Polymerization、Lava Golem、Dark Ruler No More 这类后攻破场的卡）。
+        {!study.handtraps && " 手坑已按网站的手坑表预选，请检查。"}
+        标好后点「确认已标好」，才能用第 8 步的换 side 模拟。
+      </p>
+      <div className="seg" role="radiogroup" aria-label="标记什么">
+        {(
+          [
+            ["handtrap", `标手坑（${handtraps.size}）`],
+            ["breaker", `标解牌（${breakers.size}）`],
+          ] as const
+        ).map(([m, text]) => (
+          <label key={m} className={mode === m ? "on" : undefined}>
+            <input type="radio" name="role-mode" checked={mode === m} onChange={() => setMode(m)} />
+            {text}
+          </label>
+        ))}
+      </div>
+      <h3 className="sub-title">主卡组</h3>
+      <div className="deck-grid">{unique(study.main).map(card)}</div>
+      <h3 className="sub-title">side</h3>
+      {sideOnly.length ? <div className="deck-grid">{sideOnly.map(card)}</div> : <SideImport data={data} study={study} onChange={onChange} />}
+      <div className="row-actions">
+        {study.rolesConfirmed ? (
+          <span className="muted">✓ 已确认。之后改标记，上手率和换 side 模拟会跟着更新。</span>
+        ) : (
+          <button className="btn primary" onClick={() => onChange({ ...study, handtraps: [...handtraps], rolesConfirmed: true })}>
+            确认已标好
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** 旧研究没有 side：粘贴带 side 的牌组导入。 */
+function SideImport({ data, study, onChange }: { data: EngineData; study: DeckStudy; onChange: (s: DeckStudy) => void }) {
+  const [text, setText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const apply = () => {
+    try {
+      const side = parseDeck(text).side.filter((id) => {
+        const c = data.cards.get(id);
+        return !!c && !isExtraDeckCard(c);
+      });
+      if (!side.length) return setError("没找到 side 的卡（YDK 里 !side 下面的卡，或 ydke 链接的第三段）");
+      setError(null);
+      onChange({ ...study, side });
+    } catch (e) {
+      setError(e instanceof DeckParseError ? e.message : "读取失败");
+    }
+  };
+  return (
+    <div className="side-import">
+      <p className="muted">这个研究没有 side。粘贴带 side 的整副牌组（YDK 或 ydke:// 链接），只读取 side 部分。</p>
+      <textarea aria-label="带 side 的牌组" rows={4} value={text} onChange={(e) => setText(e.target.value)} />
+      {error && <p className="errors-inline">{error}</p>}
+      <button className="btn" disabled={!text.trim()} onClick={apply}>
+        导入 side
+      </button>
+    </div>
+  );
+}
+
+type HandOpts = Omit<HandOptions, "size" | "main">;
+
+function SideSim({
+  data,
+  study,
+  cmp,
+  base,
+  handOpts,
+  onChange,
+  label,
+}: {
+  data: EngineData;
+  study: DeckStudy;
+  cmp: StudyComparison;
+  base: { first: HandStats; second: HandStats };
+  handOpts: HandOpts;
+  onChange: (s: DeckStudy) => void;
+  label: (s: Starter) => string;
+}) {
+  const [turn, setTurn] = useState<"first" | "second">("second");
+  const plan = study.sidePlans[turn];
+  const problem = sideProblem(study, plan);
+  const size = turn === "first" ? 5 : 6;
+  const sided = useMemo(
+    () => (problem || !study.rolesConfirmed || !study.side.length ? null : simulateHands(study, cmp, { size, ...handOpts, main: sidedMain(study.main, plan) })),
+    [study, cmp, handOpts, plan, problem, size],
+  );
+
+  if (!study.rolesConfirmed || !study.side.length) {
+    return (
+      <section className="panel">
+        <h2 className="section-title">8. 换 side 模拟</h2>
+        <p className="muted">
+          {!study.side.length ? "这个研究还没有 side，先在第 6 步导入 side。" : "先在第 6 步标好卡组里的手坑和解牌，点「确认已标好」后才能用。"}
+        </p>
+      </section>
+    );
+  }
+
+  const count = (ids: number[], id: number) => ids.filter((x) => x === id).length;
+  const setPlan = (p: SidePlan) => onChange({ ...study, sidePlans: { ...study.sidePlans, [turn]: p } });
+  const add = (key: "out" | "in", id: number, max: number) => count(plan[key], id) < max && setPlan({ ...plan, [key]: [...plan[key], id] });
+  const sub = (key: "out" | "in", id: number) => {
+    const list = [...plan[key]];
+    list.splice(list.lastIndexOf(id), 1);
+    setPlan({ ...plan, [key]: list });
+  };
+  const ht = new Set(study.handtraps ?? []);
+  const bk = new Set(study.breakers);
+  const roleTag = (id: number) => (ht.has(id) && bk.has(id) ? "坑/解" : ht.has(id) ? "坑" : bk.has(id) ? "解" : null);
+  const picker = (key: "out" | "in", pool: number[]) => (
+    <div className="deck-grid side-grid">
+      {unique(pool).map((id) => {
+        const n = count(plan[key], id);
+        const max = count(pool, id);
+        return (
+          <div key={id} className={`deck-card side-card${n ? " active picked" : ""}`} title={data.name(id)}>
+            <span className="thumb">
+              <CardView id={id} name={data.name(id)} />
+            </span>
+            {roleTag(id) && <span className="role-tag">{roleTag(id)}</span>}
+            <span className="side-count">
+              <button className="mini" onClick={() => sub(key, id)} disabled={!n} aria-label={`少${key === "out" ? "换出" : "换入"}一张 ${data.name(id)}`}>
+                −
+              </button>
+              <span>
+                {n}/{max}
+              </span>
+              <button className="mini" onClick={() => add(key, id, max)} disabled={n >= max} aria-label={`多${key === "out" ? "换出" : "换入"}一张 ${data.name(id)}`}>
+                +
+              </button>
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+  const before = turn === "first" ? base.first : base.second;
+  const diff = (a: number, b: number) => {
+    const d = Math.round((b - a) * 1000) / 10;
+    return d === 0 ? "—" : `${d > 0 ? "+" : ""}${d.toFixed(1)}`;
+  };
+  const rows = rateRows(study);
+
+  return (
+    <section className="panel">
+      <h2 className="section-title">8. 换 side 模拟</h2>
+      <p className="muted">先攻、后攻各存一套换法。选好换出和换入的卡，下面按换完的主卡组重新算所有上手率，和原卡组对比。</p>
+      <div className="seg" role="radiogroup" aria-label="先攻还是后攻">
+        {(
+          [
+            ["first", "先攻（5 张）"],
+            ["second", "后攻（6 张）"],
+          ] as const
+        ).map(([t, text]) => (
+          <label key={t} className={turn === t ? "on" : undefined}>
+            <input type="radio" name="side-turn" checked={turn === t} onChange={() => setTurn(t)} />
+            {text}
+          </label>
+        ))}
+      </div>
+      <h3 className="sub-title">
+        换出（主卡组 → side）{plan.out.length} 张
+      </h3>
+      {picker("out", study.main)}
+      <h3 className="sub-title">
+        换入（side → 主卡组）{plan.in.length} 张
+      </h3>
+      {picker("in", study.side)}
+      <p className="muted">
+        换完主卡组 {study.main.length - plan.out.length + plan.in.length} 张
+        {plan.out.length !== plan.in.length && "（换出和换入张数不一样）"}。
+        {(plan.out.length > 0 || plan.in.length > 0) && (
+          <button className="mini" onClick={() => setPlan({ out: [], in: [] })}>
+            清空这套换法
+          </button>
+        )}
+      </p>
+      {problem ? (
+        <p className="errors-inline">{problem}</p>
+      ) : (
+        sided && (
+          <div className="matrix-scroll">
+            <table className="matrix study-routes side-table">
+              <thead>
+                <tr>
+                  <th scope="col">{turn === "first" ? "先攻" : "后攻"}</th>
+                  <th scope="col">原卡组</th>
+                  <th scope="col">换 side 后</th>
+                  <th scope="col">变化</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(([name, get, hint]) => (
+                  <tr key={name}>
+                    <th scope="row" title={hint}>
+                      {name}
+                    </th>
+                    <td>{pct(get(before))}</td>
+                    <td>{pct(get(sided))}</td>
+                    <td className={deltaClass(get(sided) - get(before), name)}>{diff(get(before), get(sided))}</td>
+                  </tr>
+                ))}
+                {study.starters.map((s) => {
+                  const a = before.perStarter[s.id] ?? 0;
+                  const b = sided.perStarter[s.id] ?? 0;
+                  return (
+                    <tr key={s.id}>
+                      <th scope="row" className="muted">
+                        动点：{label(s)}
+                      </th>
+                      <td>{pct(a)}</td>
+                      <td>{pct(b)}</td>
+                      <td className={deltaClass(b - a, "")}>{diff(a, b)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
+      )}
+    </section>
+  );
+}
+
+/** 变化的颜色：卡手、废件变多是坏事，其余变多是好事。 */
+function deltaClass(d: number, name: string): string | undefined {
+  if (Math.abs(d) < 0.0005) return undefined;
+  const bad = name.startsWith("卡手") || name.includes("废件");
+  return (d > 0) !== bad ? "delta up" : "delta down";
+}
+
 function Rates({
   data,
   study,
@@ -721,25 +1032,12 @@ function Rates({
   label: (s: Starter) => string;
 }) {
   const bricks = new Set(study.bricks);
-  const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
-  const rows: [string, (h: HandStats) => number, string?][] = [
-    ["至少 1 个动点", (h) => h.anyStarter],
-    ["2 个以上不同动点（补点）", (h) => h.multiStarter, "两个不同的动点，用到的卡不重叠"],
-    ["卡手（没有动点）", (h) => 1 - h.anyStarter],
-    ["至少 1 张手坑", (h) => h.handtrap1, "卡组自己放的手坑（Ash Blossom、Maxx \"C\" 等）"],
-    ["2 张以上手坑", (h) => h.handtrap2],
-    ...(study.bricks.length
-      ? ([
-          ["至少 1 张废件", (h) => h.brick1],
-          ["2 张以上废件", (h) => h.brick2],
-        ] as [string, (h: HandStats) => number][])
-      : []),
-  ];
+  const rows = rateRows(study);
   return (
     <section className="panel">
-      <h2 className="section-title">6. 上手率</h2>
+      <h2 className="section-title">7. 上手率</h2>
       <p className="muted">
-        按主卡组 {study.main.length} 张随机抽 {first.hands.toLocaleString()} 手统计。先攻起手 5 张，后攻 6 张。
+        按主卡组 {study.main.length} 张随机抽 {first.hands.toLocaleString()} 手统计。先攻起手 5 张，后攻 6 张。手坑和解牌按第 6 步标的算。
       </p>
       <div className="matrix-scroll">
         <table className="matrix study-routes">

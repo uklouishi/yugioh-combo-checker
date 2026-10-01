@@ -17,6 +17,10 @@ export interface HandOptions {
   seed?: number;
   /** 这张卡是不是手坑。 */
   isHandtrap: (id: number) => boolean;
+  /** 这张卡是不是解牌。没有时不统计。 */
+  isBreaker?: (id: number) => boolean;
+  /** 用这副主卡组代替研究里的（换 side 后）。 */
+  main?: number[];
   /** 这张卡能不能当这个动点的通配卡。 */
   wildcardOk: (starter: Starter, id: number) => boolean;
 }
@@ -31,6 +35,11 @@ export interface HandStats {
   /** 至少 1 张、2 张以上手坑（卡组自己的手坑）。 */
   handtrap1: number;
   handtrap2: number;
+  /** 至少 1 张、2 张以上解牌。 */
+  breaker1: number;
+  breaker2: number;
+  /** 至少 1 张手坑或解牌（后攻能干扰/破场）。 */
+  interaction: number;
   /** 至少 1 张、2 张以上废件。 */
   brick1: number;
   brick2: number;
@@ -76,11 +85,12 @@ const pct = (n: number, d: number) => (d ? Math.round((n / d) * 1000) / 1000 : 0
 export function simulateHands(study: DeckStudy, cmp: StudyComparison, opts: HandOptions): HandStats {
   const n = opts.hands ?? 20000;
   const next = rng(opts.seed ?? 20261001);
-  const deck = [...study.main];
+  const deck = [...(opts.main ?? study.main)];
   const size = Math.min(opts.size, deck.length);
   const bricks = new Set(study.bricks);
   const routes = new Map(cmp.routes.map((r) => [r.starter.id, r]));
-  const c = { any: 0, multi: 0, ht1: 0, ht2: 0, b1: 0, b2: 0, played: 0 };
+  const c = { any: 0, multi: 0, ht1: 0, ht2: 0, bk1: 0, bk2: 0, inter: 0, b1: 0, b2: 0, played: 0 };
+  const isBreaker = opts.isBreaker ?? (() => false);
   const per: Record<string, number> = {};
   const weighted: Record<number, number> = {};
   const unavoidable: Record<string, number> = {};
@@ -97,6 +107,10 @@ export function simulateHands(study: DeckStudy, cmp: StudyComparison, opts: Hand
     const br = hand.filter((x) => bricks.has(x)).length;
     if (ht >= 1) c.ht1++;
     if (ht >= 2) c.ht2++;
+    const bk = hand.filter(isBreaker).length;
+    if (bk >= 1) c.bk1++;
+    if (bk >= 2) c.bk2++;
+    if (ht + bk >= 1) c.inter++;
     if (br >= 1) c.b1++;
     if (br >= 2) c.b2++;
 
@@ -130,6 +144,9 @@ export function simulateHands(study: DeckStudy, cmp: StudyComparison, opts: Hand
     multiStarter: pct(c.multi, n),
     handtrap1: pct(c.ht1, n),
     handtrap2: pct(c.ht2, n),
+    breaker1: pct(c.bk1, n),
+    breaker2: pct(c.bk2, n),
+    interaction: pct(c.inter, n),
     brick1: pct(c.b1, n),
     brick2: pct(c.b2, n),
     perStarter: norm(per, n),

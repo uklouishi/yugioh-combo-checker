@@ -4,7 +4,7 @@ import { HT } from "../model/interruptions";
 import { Combo } from "../model/schema";
 import { compareStudy } from "./compare";
 import { simulateHands } from "./hands";
-import { addStarter, newStudy, saveRoute, type DeckStudy } from "./model";
+import { addStarter, newStudy, saveRoute, sidedMain, sideProblem, type DeckStudy } from "./model";
 
 const snakeEye = Combo.parse(JSON.parse(readFileSync(new URL("../data/combos/snake-eye-ash-1card.json", import.meta.url), "utf8")));
 const bare = Combo.parse({ ...snakeEye, steps: snakeEye.steps.map((s) => ({ ...s, interruptions: [] })) });
@@ -69,5 +69,42 @@ describe("simulateHands", () => {
     expect(shared.routes).toHaveLength(2);
     expect(cmp.axis.some((a) => a.label === "通常召唤 Snake-Eye Ash")).toBe(false);
     expect(h.unavoidable[shared.sig]).toBe(1);
+  });
+});
+
+describe("解牌和换 side", () => {
+  const SUPER_POLY = 48130397;
+  const LAVA = 102380;
+
+  it("解牌上手率和「手坑或解牌」", () => {
+    const s = study();
+    const h = simulateHands(s, compareStudy(s), { ...opts, size: 6, isBreaker: (id) => id === POPLAR });
+    expect(h.breaker1).toBeCloseTo(atLeastOne(3, 40, 6), 1);
+    expect(h.interaction).toBeCloseTo(atLeastOne(6, 40, 6), 1);
+    expect(h.interaction).toBeGreaterThanOrEqual(h.handtrap1);
+  });
+
+  it("换 side：换出 3 张其他卡、换入解牌后，解牌上手率上升，动点上手率不变", () => {
+    const s = { ...study(), side: [SUPER_POLY, SUPER_POLY, LAVA], breakers: [SUPER_POLY, LAVA] };
+    const plan = { out: [FILL, FILL, FILL], in: [SUPER_POLY, SUPER_POLY, LAVA] };
+    expect(sideProblem(s, plan)).toBeNull();
+    const main = sidedMain(s.main, plan);
+    expect(main).toHaveLength(40);
+    expect(main.filter((c) => c === FILL)).toHaveLength(28);
+    const isBreaker = (id: number) => s.breakers.includes(id);
+    const cmp = compareStudy(s);
+    const before = simulateHands(s, cmp, { ...opts, size: 6, isBreaker });
+    const after = simulateHands(s, cmp, { ...opts, size: 6, isBreaker, main });
+    expect(before.breaker1).toBe(0);
+    expect(after.breaker1).toBeCloseTo(atLeastOne(3, 40, 6), 1);
+    expect(after.anyStarter).toBeCloseTo(before.anyStarter, 1);
+  });
+
+  it("换 side 的检查", () => {
+    const s = { ...study(), side: [SUPER_POLY] };
+    expect(sideProblem(s, { out: [], in: [SUPER_POLY, SUPER_POLY] })).toMatch("side");
+    expect(sideProblem(s, { out: [ASH, ASH, ASH, ASH], in: [] })).toMatch("主卡组");
+    expect(sideProblem(s, { out: [ASH], in: [] })).toMatch("40");
+    expect(sideProblem(s, { out: [ASH], in: [SUPER_POLY] })).toBeNull();
   });
 });
