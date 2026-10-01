@@ -892,19 +892,27 @@ button.slot:disabled { cursor: default; }
 .probe-tip { margin: 0; padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--warn-bg); border-radius: 0 6px 6px 0; font-size: 13px; }
 .probe-progress { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .probe-progress progress { flex: 1 1 200px; }
-.probe-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.probe-list > li { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; }
-.probe-list > li.ok { border-color: #3c9a4a; }
-.probe-list > li.no { opacity: 0.55; }
-.probe-list .thumb { position: relative; display: block; width: 34px; aspect-ratio: 59 / 86; }
-.probe-list .thumb .placeholder > * { display: none; }
-.probe-text { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
-.probe-actions { display: flex; gap: 4px; }
-.probe-actions .mini.on { background: var(--accent); color: #fff; }
-@media (max-width: 560px) {
-  .probe-list > li { grid-template-columns: 30px minmax(0, 1fr); }
-  .probe-actions { grid-column: 2; }
+.probe-wall { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px; }
+.probe-wall > li { display: grid; gap: 3px; align-content: start; min-width: 0; padding: 4px; border-radius: 8px; }
+.probe-wall > li.open { background: var(--bg); outline: 1px solid var(--line); }
+.probe-card { position: relative; padding: 0; background: none; border: 3px dashed var(--line); border-radius: 6px; }
+.probe-wall > li.ok .probe-card { border: 3px solid #3c9a4a; }
+.probe-wall > li.partial .probe-card { border: 3px solid #d99a2b; }
+.probe-wall > li.no .probe-card { border: 3px solid var(--line); filter: grayscale(1); opacity: 0.5; }
+.probe-card .thumb { position: relative; display: block; aspect-ratio: 59 / 86; }
+.probe-card .thumb .placeholder > * { display: none; }
+.probe-mark {
+  position: absolute; right: 3px; top: 3px; z-index: 2; width: 18px; height: 18px; border-radius: 50%;
+  display: grid; place-items: center; font: 700 11px var(--body); color: #fff; background: rgba(0, 0, 0, 0.6);
 }
+.probe-wall > li.ok .probe-mark { background: #3c9a4a; }
+.probe-name { font-size: 11px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.probe-reached { display: flex; flex-wrap: wrap; gap: 2px; }
+.probe-reached .thumb { position: relative; display: block; width: 16px; aspect-ratio: 59 / 86; }
+.probe-reached .thumb .placeholder > * { display: none; }
+.probe-more { justify-self: start; font-size: 11px; padding: 0 4px; }
+.probe-detail { display: grid; gap: 6px; max-height: 360px; overflow-y: auto; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; }
+.probe-detail-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .probe-cases { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; font-size: 12px; }
 .probe-cases label { display: flex; gap: 6px; align-items: flex-start; }
 
