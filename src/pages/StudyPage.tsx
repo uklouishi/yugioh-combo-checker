@@ -8,13 +8,17 @@ import { SAMPLE_DECK } from "../play/sample";
 import { queueDuel } from "../play/useDuel";
 import { href, navigate } from "../router";
 import { compareStudy, type StudyComparison } from "../study/compare";
-import { addStarter, newStudy, removeStarter, starterProblem, usesNormal, type DeckStudy, type Starter } from "../study/model";
+import { addStarter, newStudy, removeStarter, sameStarter, starterHand, starterProblem, usesNormal, type CardFilter, type DeckStudy, type Starter, type Wildcard } from "../study/model";
+import { ATTRIBUTES, RACES, blankFor, deckMatches, filterLabel, matches, practiceMain, starterLabel } from "../study/wildcard";
 import { parseStudies, setStudyTarget, studyStore, useStudies } from "../study/store";
 import { CardView } from "../ui/CardView";
 import { downloadJson } from "../ui/download";
 import { NotFound } from "./NotFound";
 
 const FORMAT_LABEL: Record<Format, string> = { tcg: "TCG", ocg: "OCG" };
+
+/** 单卡动点（不带通配）。 */
+const isSingle = (s: Starter) => s.cards.length === 1 && !s.wildcard;
 
 /** 去重，保持第一次出现的顺序。 */
 const unique = (ids: number[]) => [...new Set(ids)];
@@ -181,14 +185,14 @@ function StudyDetail({ data, study }: { data: EngineData; study: DeckStudy }) {
   const update = (s: DeckStudy) => studyStore.save(s);
   const mainCards = unique(study.main);
   const extraCards = unique(study.extra);
-  const singles = new Set(study.starters.filter((s) => s.cards.length === 1).map((s) => s.cards[0]));
+  const singles = new Set(study.starters.filter(isSingle).map((s) => s.cards[0]));
   const keys = new Set(study.keyCards);
   const cmp = useMemo(() => compareStudy(study), [study]);
   const done = study.starters.filter((s) => study.routes[s.id]).length;
-  const label = (s: Starter) => s.cards.map((c) => data.name(c)).join(" + ");
+  const label = (s: Starter) => starterLabel(data, s);
 
   const toggleSingle = (card: number) => {
-    const existing = study.starters.find((s) => s.cards.length === 1 && s.cards[0] === card);
+    const existing = study.starters.find((s) => isSingle(s) && s.cards[0] === card);
     if (!existing) return update(addStarter(study, [card]));
     if (study.routes[existing.id] && !window.confirm(`${data.name(card)} 已经打过路线，删掉这个动点会连路线一起删掉。确定吗？`)) return;
     update(removeStarter(study, existing.id));
@@ -199,8 +203,9 @@ function StudyDetail({ data, study }: { data: EngineData; study: DeckStudy }) {
     update({ ...study, normalSummon: { ...study.normalSummon, [String(card)]: !usesNormal(study, card) } });
 
   const play = (s: Starter) => {
-    queueDuel(practiceSetup(data, { main: study.main, extra: study.extra, hand: s.cards, format: study.format }));
-    setStudyTarget({ studyId: study.id, starterId: s.id, hand: s.cards });
+    const hand = starterHand(s);
+    queueDuel(practiceSetup(data, { main: practiceMain(study, s), extra: study.extra, hand, format: study.format }));
+    setStudyTarget({ studyId: study.id, starterId: s.id, hand });
     navigate(href.play());
   };
   const view = (s: Starter, to: "view" | "analyze") => {
@@ -273,7 +278,7 @@ function StudyDetail({ data, study }: { data: EngineData; study: DeckStudy }) {
         </div>
       </section>
 
-      <PairPicker data={data} study={study} cards={mainCards} onAdd={(cards) => update(addStarter(study, cards))} />
+      <PairPicker data={data} study={study} cards={mainCards} onAdd={(cards, wildcard) => update(addStarter(study, cards, new Date(), wildcard))} />
 
       <section className="panel">
         <h2 className="section-title">3. 重要终端</h2>
@@ -303,7 +308,7 @@ function StudyDetail({ data, study }: { data: EngineData; study: DeckStudy }) {
           <p className="muted">先在上面选动点。</p>
         ) : (
           <>
-            <p className="muted">点「打这一手」进练习模式，起手固定是这几张（其余用空白卡补满）。打完回合后点「保存到研究」回到这里。</p>
+            <p className="muted">点「打这一手」进练习模式，起手只有这几张，方便看清这一手单独能打到哪里。打完回合后点「保存到研究」回到这里。</p>
             <ul className="starter-list">
               {study.starters.map((s) => {
                 const route = study.routes[s.id];
@@ -317,6 +322,12 @@ function StudyDetail({ data, study }: { data: EngineData; study: DeckStudy }) {
                           <CardView id={c} name={data.name(c)} />
                         </span>
                       ))}
+                      {s.wildcard && (
+                        <span className="thumb any" title={`${filterLabel(s.wildcard.filter)}，练习时用 ${data.name(s.wildcard.representative)}`}>
+                          <CardView id={s.wildcard.representative} name={data.name(s.wildcard.representative)} />
+                          <span className="any-tag">任意</span>
+                        </span>
+                      )}
                     </div>
                     <div className="info">
                       <strong>{label(s)}</strong>
@@ -328,6 +339,7 @@ function StudyDetail({ data, study }: { data: EngineData; study: DeckStudy }) {
                           </label>
                         ))}
                       </div>
+                      {s.wildcard && <div className="muted">练习时用 {data.name(s.wildcard.representative)} 代表{filterLabel(s.wildcard.filter)}。</div>}
                       {problem && <p className="errors-inline">{problem}</p>}
                       {route && summary ? (
                         <div className="muted">
@@ -381,17 +393,39 @@ function KeyCard({ data, id, on, onToggle }: { data: EngineData; id: number; on:
   );
 }
 
-function PairPicker({ data, study, cards, onAdd }: { data: EngineData; study: DeckStudy; cards: number[]; onAdd: (cards: number[]) => void }) {
+const ANY = -1;
+
+function PairPicker({ data, study, cards, onAdd }: { data: EngineData; study: DeckStudy; cards: number[]; onAdd: (cards: number[], wildcard?: Wildcard) => void }) {
   // 单卡动点排在前面
-  const singles = study.starters.filter((s) => s.cards.length === 1).map((s) => s.cards[0]);
+  const singles = study.starters.filter(isSingle).map((s) => s.cards[0]);
   const options = unique([...singles, ...cards]);
   const [a, setA] = useState<number>(options[0] ?? 0);
   const [b, setB] = useState<number>(options[1] ?? options[0] ?? 0);
-  const pair = [a, b];
-  const problem = starterProblem(study, pair);
-  const exists = study.starters.some((s) => s.cards.length === 2 && [...s.cards].sort().join() === [...pair].sort().join());
-  const select = (value: number, set: (v: number) => void, label: string) => (
+  const [filter, setFilter] = useState<CardFilter>({});
+  const [rep, setRep] = useState<number | null>(null);
+  const any = b === ANY;
+
+  // 卡组里的怪兽有哪些种族、属性，选项只列这些
+  const monsters = cards.map((id) => data.cards.get(id)!).filter((c) => matches(c, {}));
+  const races = RACES.filter(([bit]) => monsters.some((c) => (c.data.race & BigInt(bit)) !== 0n));
+  const attrs = ATTRIBUTES.filter(([bit]) => monsters.some((c) => (c.data.attribute & bit) !== 0));
+  const members = any ? deckMatches(data, study, filter) : [];
+  const blank = any ? blankFor(data, filter) : null;
+  const representative = rep !== null && members.includes(rep) ? rep : (blank ?? members[0] ?? null);
+  const copies = members.reduce((n, id) => n + study.main.filter((x) => x === id).length, 0);
+
+  const pair = any ? [a] : [a, b];
+  const wildcard: Wildcard | undefined = any && representative !== null ? { filter, representative } : undefined;
+  const problem = any ? (members.filter((m) => m !== a).length ? starterProblem(study, pair) : "卡组里没有符合条件的卡") : starterProblem(study, pair);
+  const exists = study.starters.some((s) => sameStarter(s, { cards: pair, wildcard }));
+  const setF = (patch: Partial<CardFilter>) => {
+    const next = { ...filter, ...patch };
+    for (const k of Object.keys(next) as (keyof CardFilter)[]) if (!next[k]) delete next[k];
+    setFilter(next);
+  };
+  const select = (value: number, set: (v: number) => void, label: string, withAny: boolean) => (
     <select value={value} onChange={(e) => set(Number(e.target.value))} aria-label={label}>
+      {withAny && <option value={ANY}>任意…（按种族、属性、等级）</option>}
       {options.map((id) => (
         <option key={id} value={id}>
           {data.name(id)}
@@ -404,17 +438,66 @@ function PairPicker({ data, study, cards, onAdd }: { data: EngineData; study: De
   return (
     <section className="panel">
       <h2 className="section-title">2. 两卡组合</h2>
-      <p className="muted">两张一起才动得起来，或者想看两张一起能多打出什么。两张都要通常召唤的组合会被拦下。</p>
+      <p className="muted">
+        两张一起才动得起来，或者想看两张一起能多打出什么。第二张可以选「任意…」，比如 Regulus + 任意魔法师族怪兽。两张都要通常召唤的组合会被拦下。
+      </p>
       <div className="chips-edit">
-        {select(a, setA, "第一张")}
+        {select(a, setA, "第一张", false)}
         <span>+</span>
-        {select(b, setB, "第二张")}
-        <button className="btn" disabled={!!problem || exists} onClick={() => onAdd(pair)}>
+        {select(b, setB, "第二张", true)}
+      </div>
+      {any && (
+        <div className="wildcard">
+          <div className="chips-edit">
+            <select value={filter.race ?? 0} onChange={(e) => setF({ race: Number(e.target.value) })} aria-label="种族">
+              <option value={0}>种族不限</option>
+              {races.map(([bit, name]) => (
+                <option key={bit} value={bit}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <select value={filter.attribute ?? 0} onChange={(e) => setF({ attribute: Number(e.target.value) })} aria-label="属性">
+              <option value={0}>属性不限</option>
+              {attrs.map(([bit, name]) => (
+                <option key={bit} value={bit}>
+                  {name}属性
+                </option>
+              ))}
+            </select>
+            <select value={filter.maxLevel ?? 0} onChange={(e) => setF({ maxLevel: Number(e.target.value) })} aria-label="等级">
+              <option value={0}>等级不限</option>
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                <option key={n} value={n}>
+                  {n} 星以下
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="muted">
+            <strong>{filterLabel(filter)}</strong>：卡组里有 {members.length} 种 {copies} 张
+            {members.length > 0 && `（${members.map((id) => data.name(id)).join("、")}）`}。
+          </p>
+          <label className="study-field">
+            <span className="field-label">练习时放进起手的卡</span>
+            <select value={representative ?? ""} onChange={(e) => setRep(Number(e.target.value))} aria-label="代表卡">
+              {blank !== null && <option value={blank}>白板：{data.name(blank)}（白板，不算第二张自己的效果）</option>}
+              {members.map((id) => (
+                <option key={id} value={id}>
+                  {data.name(id)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+      <div className="start-row">
+        <button className="btn" disabled={!!problem || exists} onClick={() => onAdd(pair, wildcard)}>
           添加组合
         </button>
+        {problem && <span className="errors-inline">{problem}</span>}
+        {exists && <span className="muted">这个组合已经加过了。</span>}
       </div>
-      {problem && <p className="errors-inline">{problem}</p>}
-      {exists && <p className="muted">这个组合已经加过了。</p>}
     </section>
   );
 }
@@ -429,9 +512,9 @@ function Comparison({ data, study, cmp }: { data: EngineData; study: DeckStudy; 
       </section>
     );
   }
-  const starterLabel = (id: string) => {
+  const nameOf = (id: string) => {
     const s = study.starters.find((x) => x.id === id);
-    return s ? s.cards.map((c) => data.name(c)).join(" + ") : "";
+    return s ? starterLabel(data, s) : "";
   };
   const htName = (id: number) => handtrapById.get(id)?.name ?? data.name(id);
   const names = (ids: number[]) => ids.map((c) => data.name(c)).join("、");
@@ -461,7 +544,7 @@ function Comparison({ data, study, cmp }: { data: EngineData; study: DeckStudy; 
           <tbody>
             {cmp.routes.map((r) => (
               <tr key={r.starter.id}>
-                <th scope="row">{starterLabel(r.starter.id)}</th>
+                <th scope="row">{nameOf(r.starter.id)}</th>
                 <td>{r.normalSummon ? "用了" : "没用"}</td>
                 <td>{r.combo.steps.length}</td>
                 <td className="key-cell">
@@ -496,7 +579,7 @@ function Comparison({ data, study, cmp }: { data: EngineData; study: DeckStudy; 
                   <strong>{htName(h.handtrap)}</strong>
                   <span className="muted">
                     {h.routesHurt} / {total} 条路线会少重要终端，{h.routesHit} 条能打
-                    {worst?.keyLost.length ? ` · 最痛：${starterLabel(worst.starterId)} 第 ${worst.step} 步，少 ${names(worst.keyLost)}` : ""}
+                    {worst?.keyLost.length ? ` · 最痛：${nameOf(worst.starterId)} 第 ${worst.step} 步，少 ${names(worst.keyLost)}` : ""}
                   </span>
                 </span>
                 <span className="rank-score">
@@ -510,7 +593,7 @@ function Comparison({ data, study, cmp }: { data: EngineData; study: DeckStudy; 
                 <ul className="rank-detail">
                   {h.hits.map((x) => (
                     <li key={x.starterId}>
-                      <strong>{starterLabel(x.starterId)}</strong>：{x.keyLost.length ? `少 ${names(x.keyLost)}。` : "重要终端不受影响。"}
+                      <strong>{nameOf(x.starterId)}</strong>：{x.keyLost.length ? `少 ${names(x.keyLost)}。` : "重要终端不受影响。"}
                       <span className="muted">{x.reason}</span>
                     </li>
                   ))}
@@ -541,7 +624,7 @@ function Comparison({ data, study, cmp }: { data: EngineData; study: DeckStudy; 
                 <span className="rank-text">
                   <strong>{data.name(k.card)}</strong>
                   <span className="muted">
-                    {k.routes.length} 条路线 · 平均打掉 {pct(k.score)} · 最痛：{starterLabel(k.worst.starterId)} 第 {k.worst.step} 步，少 {names(k.worst.keyLost)}
+                    {k.routes.length} 条路线 · 平均打掉 {pct(k.score)} · 最痛：{nameOf(k.worst.starterId)} 第 {k.worst.step} 步，少 {names(k.worst.keyLost)}
                   </span>
                 </span>
               </li>

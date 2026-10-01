@@ -16,7 +16,8 @@ import { forgetDuel, savedDuel, useDuel } from "../play/useDuel";
 import { useHandDrag } from "../play/useHandDrag";
 import { CardView } from "../ui/CardView";
 import { downloadCombo } from "../ui/download";
-import { sameHand, saveRoute } from "../study/model";
+import { sameHand, saveRoute, starterHand } from "../study/model";
+import { starterLabel } from "../study/wildcard";
 import { setStudyTarget, studyStore, studyTarget } from "../study/store";
 
 interface PileView {
@@ -117,7 +118,7 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
     const t = studyTarget();
     const s = t && studyStore.find(t.studyId);
     const starter = s?.starters.find((x) => x.id === t!.starterId);
-    return t && s && starter && session?.setup.hand && sameHand(session.setup.hand, starter.cards) ? { study: s, starter } : null;
+    return t && s && starter && session?.setup.hand && sameHand(session.setup.hand, starterHand(starter)) ? { study: s, starter } : null;
   }, [session]);
   const acts = useMemo(() => cardActions(data, prompt), [data, prompt, duel.version]); // eslint-disable-line react-hooks/exhaustive-deps
   const { respond } = duel;
@@ -265,7 +266,7 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
     <main className={`page play dueling${drag.drag ? " dragging" : ""}`}>
       {study && (
         <div className="banner study-banner">
-          卡组研究「{study.study.name}」：起手 {study.starter.cards.map((c) => data.name(c)).join(" + ")}。打完回合后点「保存到研究」。
+          卡组研究「{study.study.name}」：起手 {starterLabel(data, study.starter)}。打完回合后点「保存到研究」。
           <a href={href.study(study.study.id)}>回到研究</a>
         </div>
       )}
@@ -507,7 +508,7 @@ function saveToStudy(session: DuelSession, studyId: string, starterId: string) {
   if (!study || !starter) return window.alert("找不到这个卡组研究，可能已经被删除了。");
   if (study.routes[starterId] && !window.confirm("这个动点已经存过一条路线，用这次的覆盖吗？")) return;
   try {
-    const names = starter.cards.map((c) => session.data.name(c)).join(" + ");
+    const names = starterLabel(session.data, starter);
     const combo = toCombo(session, { title: `${study.name}：${names}`, deck: study.name });
     combo.id = `${study.id}-${starter.id}`;
     studyStore.save(saveRoute(study, starterId, combo));
