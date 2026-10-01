@@ -29,6 +29,10 @@ export interface RouteSummary {
   sigs: string[];
   /** 动作签名 → 这个动作（第一次出现的那步）被无效时少掉几张重要终端。 */
   sigLoss: Record<string, number>;
+  /** 动作签名 → 第一次出现在第几步（0 起）。 */
+  sigStep: Record<string, number>;
+  /** 通常召唤在第几步（0 起），没有通召是 -1。 */
+  nsStep: number;
 }
 
 export interface RouteHit {
@@ -113,6 +117,9 @@ export interface StudyComparison {
  * 动作的签名：同一张卡的同一种发动（同一区域、同样的处理）或同一种召唤算同一个动作，
  * 不同路线里出现同一个签名，说明它是卡组的共同步骤。
  */
+/** 动作签名里的卡。 */
+export const sigCard = (sig: string) => Number(sig.split(":")[1]);
+
 export function actionSig(a: StepAction): string {
   if (a.type === "activate") return `act:${a.activation.card.id}:${a.activation.from}:${[...a.activation.effects].sort().join(",")}`;
   return `sum:${a.summon.card.id}:${a.summon.method}`;
@@ -148,6 +155,8 @@ export function compareStudy(study: DeckStudy): StudyComparison {
         normalSummon: combo.steps.some((s) => s.actions.some((a) => a.type === "summon" && a.summon.method === "normal")),
         sigs: [...new Set(combo.steps.flatMap((s) => s.actions.map(actionSig)))],
         sigLoss: {},
+        sigStep: {},
+        nsStep: combo.steps.findIndex((s) => s.actions.some((a) => a.type === "summon" && a.summon.method === "normal")),
       },
     ];
   });
@@ -176,6 +185,7 @@ export function compareStudy(study: DeckStudy): StudyComparison {
         const sig = actionSig(a);
         if (seen.has(sig)) continue;
         seen.add(sig);
+        r.sigStep[sig] = i;
         r.sigLoss[sig] = r.keyEnd.length ? lostOf(r.keyEnd, lossIfNegated(r.combo, i)).length : 0;
         const ax = axis.get(sig) ?? { sig, card: a.type === "activate" ? a.activation.card.id : a.summon.card.id, label: actionLabel(a), routes: [], hitBy: [], keyLoss: 0, lossSum: 0, lossN: 0 };
         ax.routes.push(r.starter.id);

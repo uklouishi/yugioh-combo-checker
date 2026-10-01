@@ -1,6 +1,7 @@
 import { OcgLocation, OcgMessageType, OcgResponseType, type OcgResponse } from "ocgcore-wasm";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadEngineData, type EngineData } from "../engine/data";
+import { encodeReplay } from "../engine/replay";
 import { freePlaces, type DuelSession, type DuelSetup, type FieldCard } from "../engine/session";
 import { comboStore } from "../data/store";
 import { href, navigate } from "../router";
@@ -511,7 +512,7 @@ function saveToStudy(session: DuelSession, studyId: string, starterId: string) {
     const names = starterLabel(session.data, starter);
     const combo = toCombo(session, { title: `${study.name}：${names}`, deck: study.name });
     combo.id = `${study.id}-${starter.id}`;
-    studyStore.save(saveRoute(study, starterId, combo));
+    studyStore.save(saveRoute(study, starterId, combo, encodeReplay({ setup: session.setup, responses: session.responses })));
     // 播放、单条分析用的是「我的 combo」，同 id 的旧路线一起换掉
     if (comboStore.isMine(combo.id)) comboStore.save([combo]);
     navigate(href.study(studyId));

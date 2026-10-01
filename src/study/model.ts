@@ -46,6 +46,22 @@ export const SidePlan = z.object({
 });
 export type SidePlan = z.infer<typeof SidePlan>;
 
+/** 引擎试出来的续打：这条路线在这个动作被手坑打断后，手里另有 card 时能接着出 reached。 */
+export const Recovery = z.object({
+  starterId: z.string(),
+  /** 被打的动作（compare.ts 的 actionSig）。 */
+  sig: z.string(),
+  /** 试的时候用的手坑。 */
+  handtrap: CardId,
+  card: CardId,
+  /** 续出来的关键怪兽（路线里的额外怪兽或重要终端）。 */
+  reached: CardId,
+  line: z.array(z.string()),
+  /** 玩家确认：true 对，false 不对，没写表示还没确认。 */
+  ok: z.boolean().optional(),
+});
+export type Recovery = z.infer<typeof Recovery>;
+
 export const DeckStudy = z.object({
   id: z.string(),
   name: z.string(),
@@ -71,6 +87,10 @@ export const DeckStudy = z.object({
   sidePlans: z.object({ first: SidePlan, second: SidePlan }).default({ first: { out: [], in: [] }, second: { out: [], in: [] } }),
   /** 动点 id → 打出来的路线。 */
   routes: z.record(z.string(), Combo).default({}),
+  /** 动点 id → 这条路线的对局记录（engine/replay.ts 的字符串），引擎自动试补点时用来重放。 */
+  replays: z.record(z.string(), z.string()).default({}),
+  /** 引擎试出来的「被打后靠这张卡续上」，玩家确认过的才算进手坑优先级。 */
+  recoveries: z.array(Recovery).default([]),
   updatedAt: z.string(),
 });
 export type DeckStudy = z.infer<typeof DeckStudy>;
@@ -119,6 +139,8 @@ export function newStudy(name: string, main: number[], extra: number[], format: 
     rolesConfirmed: false,
     sidePlans: { first: { out: [], in: [] }, second: { out: [], in: [] } },
     routes: {},
+    replays: {},
+    recoveries: [],
     updatedAt: now.toISOString().slice(0, 10),
   };
 }
@@ -131,14 +153,15 @@ export function addStarter(study: DeckStudy, cards: number[], now = new Date(), 
 
 export function removeStarter(study: DeckStudy, id: string): DeckStudy {
   const { [id]: _gone, ...routes } = study.routes;
-  return { ...study, starters: study.starters.filter((s) => s.id !== id), routes };
+  const { [id]: _replay, ...replays } = study.replays;
+  return { ...study, starters: study.starters.filter((s) => s.id !== id), routes, replays, recoveries: study.recoveries.filter((r) => r.starterId !== id) };
 }
 
 /**
  * 存一条路线。单卡动顺便按路线里实际有没有通常召唤更新这张卡的通召标记
  * （引擎打出来的才是准的，两卡动分不清是哪一张召唤的，不改）。
  */
-export function saveRoute(study: DeckStudy, starterId: string, combo: Combo): DeckStudy {
+export function saveRoute(study: DeckStudy, starterId: string, combo: Combo, replay?: string): DeckStudy {
   const starter = study.starters.find((s) => s.id === starterId);
   if (!starter) return study;
   const normalSummon = { ...study.normalSummon };
@@ -146,7 +169,12 @@ export function saveRoute(study: DeckStudy, starterId: string, combo: Combo): De
     const ns = combo.steps.some((s) => s.actions.some((a) => a.type === "summon" && a.summon.method === "normal"));
     normalSummon[String(starter.cards[0])] = ns;
   }
-  return { ...study, normalSummon, routes: { ...study.routes, [starterId]: combo } };
+  // 路线换了，之前引擎为这条路线试出来的续打作废
+  const replays = { ...study.replays };
+  if (replay) replays[starterId] = replay;
+  else delete replays[starterId];
+  const recoveries = study.recoveries.filter((r) => r.starterId !== starterId);
+  return { ...study, normalSummon, routes: { ...study.routes, [starterId]: combo }, replays, recoveries };
 }
 
 /** 换 side 后的主卡组：换出的卡按张数去掉，换入的加上。 */

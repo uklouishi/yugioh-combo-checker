@@ -36,6 +36,8 @@ export interface DuelSetup {
   opponentSynchro?: number;
   format?: Format;
   seed: number;
+  /** 让对手在自己的这张卡发动效果（或被召唤）时，用这张手坑连锁一次（卡组研究自动试补点用）。 */
+  opponentPlan?: { code: number; on: number };
 }
 
 /**
@@ -165,6 +167,8 @@ export interface Hit {
   options: HitOption[];
   /** 对手实际发动了其中哪张。 */
   used?: number;
+  /** 这时正在处理的自己的卡：连锁上最上面的自己的卡，没有连锁时是刚召唤的怪兽。 */
+  on?: number;
 }
 
 export interface Action {
@@ -216,6 +220,10 @@ export class DuelSession {
   private chain: { code: number; controller: number }[] = [];
   private finished = false;
   private own: number[] = [];
+  private lastSummoned = 0;
+  private planUsed = false;
+  /** 自己每做一次选择就调用（卡组研究按卡名重放路线用）。 */
+  onOwnAnswer?: (m: SelectMessage, r: OcgResponse) => void;
 
   constructor(
     private readonly core: OcgCoreSync,
@@ -416,6 +424,8 @@ export class DuelSession {
   private answer(m: SelectMessage, r: OcgResponse, auto = false) {
     const at = this.ri++;
     if (m.player === 0 && !auto) this.own.push(at);
+    if (m.player === 0 && !auto) this.onOwnAnswer?.(m, r);
+    if (m.type === OcgMessageType.SELECT_IDLECMD) this.lastSummoned = 0;
     if (m.player === 0 && m.type === OcgMessageType.SELECT_IDLECMD && r.type === OcgResponseType.SELECT_IDLECMD) {
       const a = idleLabel(m, r, this.data);
       this.actions.push({ ...a, at });
@@ -438,6 +448,14 @@ export class DuelSession {
     const want = this.setup.opponentSynchro;
     switch (m.type) {
       case OcgMessageType.SELECT_CHAIN: {
+        const plan = this.setup.opponentPlan;
+        if (plan && !this.planUsed && this.currentOwnCard() === plan.on) {
+          const i = m.selects.findIndex((c) => c.code === plan.code && c.location === OcgLocation.HAND);
+          if (i >= 0) {
+            this.planUsed = true;
+            return { type: OcgResponseType.SELECT_CHAIN, index: i };
+          }
+        }
         // 已经用过的手坑留下的后续效果（例如被送去墓地的 Golden Cloud Beast - Malong）直接发动
         const i = m.selects.findIndex((c) => c.location !== OcgLocation.HAND);
         return i >= 0 ? { type: OcgResponseType.SELECT_CHAIN, index: i } : null;
@@ -483,7 +501,14 @@ export class DuelSession {
     const context = this.lastEvent;
     const key = options.map((o) => o.code).join(",");
     const dup = this.hits.some((h) => h.action === action && h.context === context && h.options.map((o) => o.code).join(",") === key);
-    if (!dup) this.hits.push({ at: this.ri, action, context, options });
+    if (!dup) this.hits.push({ at: this.ri, action, context, options, on: this.currentOwnCard() });
+  }
+
+  /** 正在处理的自己的卡：连锁上最上面的是自己的卡就是它，没有连锁时是刚召唤的怪兽。 */
+  private currentOwnCard(): number | undefined {
+    const top = this.chain.at(-1);
+    if (top) return top.controller === 0 ? top.code : undefined;
+    return this.lastSummoned || undefined;
   }
 
   private logLine(action: number, who: 0 | 1, text: string, code?: number) {
@@ -519,11 +544,13 @@ export class DuelSession {
         break;
       case OcgMessageType.SUMMONING:
         this.trace.push({ action: act, kind: "summon", code: m.code, controller: m.controller, normal: true });
+        if (m.controller === 0) this.lastSummoned = m.code;
         this.lastEvent = `${nm(m.code)} 通常召唤`;
         this.logLine(act, m.controller, `通常召唤 ${nm(m.code)}`, m.code);
         break;
       case OcgMessageType.SPSUMMONING:
         this.trace.push({ action: act, kind: "summon", code: m.code, controller: m.controller, normal: false });
+        if (m.controller === 0) this.lastSummoned = m.code;
         this.lastEvent = `${nm(m.code)} 特殊召唤`;
         this.logLine(act, m.controller, `特殊召唤 ${nm(m.code)}`, m.code);
         break;
