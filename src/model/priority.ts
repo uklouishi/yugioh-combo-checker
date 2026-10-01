@@ -141,6 +141,8 @@ interface Eval {
   reason: string;
   lostSteps: number;
   endLost: number;
+  /** 这一下打掉的卡（拿不到或离场），用来算终场里少了哪些。 */
+  lost: Set<number>;
   draws?: number;
 }
 
@@ -170,13 +172,13 @@ function evaluate(combo: Combo, io: StepIO[], hit: Interruption): Eval {
     const draws = drawsAfter(h, io, i);
     const score = Math.min(1, draws / DRAW_CAP) * 0.85;
     const reason = draws ? `第 ${i + 1} 步丢出后，这条路线之后还会让对手抽约 ${draws} 张（不打断展开，但对手资源变多）` : `第 ${i + 1} 步之后没有会让对手抽卡的召唤，基本没用`;
-    return { score, draws, lostSteps: 0, endLost: 0, reason };
+    return { score, draws, lostSteps: 0, endLost: 0, lost: new Set(), reason };
   }
   if (h === HT.NIBIRU) {
     const loss = propagate(io, i, monstersAfter(combo, i));
     // 终场怪兽如果在这之后才召唤出来就不受影响；已经在场上的全部解放
     const r = lossScore(loss);
-    return { ...r, reason: `第 ${i + 1} 步召唤后发动，场上怪兽全部解放：${tail(r)}` };
+    return { ...r, lost: loss.cards, reason: `第 ${i + 1} 步召唤后发动，场上怪兽全部解放：${tail(r)}` };
   }
   if (h === HT.DROLL) {
     const later = io.map((x, j) => (j > i && x.searches ? j : -1)).filter((j) => j >= 0);
@@ -190,20 +192,47 @@ function evaluate(combo: Combo, io: StepIO[], hit: Interruption): Eval {
       { steps: new Set(), cards: new Set() },
     );
     const r = lossScore(loss);
-    return { ...r, reason: later.length ? `${actorName} 检索后发动，之后 ${later.length} 次检索全部落空：${tail(r)}` : `${actorName} 检索后发动，但之后没有再从卡组检索，影响不大` };
+    return { ...r, lost: loss.cards, reason: later.length ? `${actorName} 检索后发动，之后 ${later.length} 次检索全部落空：${tail(r)}` : `${actorName} 检索后发动，但之后没有再从卡组检索，影响不大` };
   }
   if (h === HT.GHOST_OGRE || h === HARMONIA) {
     const card = actor?.type === "activate" ? actor.activation.card.id : io[i].firstActivation;
     const loss = propagate(io, i, card ? [card] : []);
     const r = lossScore(loss);
     const how = h === HT.GHOST_OGRE ? "被破坏（效果照常处理）" : "被 Harmonia 的效果处理掉";
-    return { ...r, reason: `第 ${i + 1} 步 ${actorName} ${how}：${tail(r)}` };
+    return { ...r, lost: loss.cards, reason: `第 ${i + 1} 步 ${actorName} ${how}：${tail(r)}` };
   }
   // 其余按「这一步的效果被无效」算
   const loss = propagate(io, i, [], [i]);
   const r = lossScore(loss);
   const verb = h === HT.DD_CROW || h === HT.CALLED_BY ? "因为墓地的卡被除外而落空" : "被无效";
-  return { ...r, reason: `第 ${i + 1} 步 ${actorName} 的效果${verb}：${tail(r)}` };
+  return { ...r, lost: loss.cards, reason: `第 ${i + 1} 步 ${actorName} 的效果${verb}：${tail(r)}` };
+}
+
+export interface HitEval {
+  hit: Interruption;
+  /** 第几步（1 起）。 */
+  step: number;
+  score: number;
+  reason: string;
+  /** 打掉的卡：终场卡在这里面就是被这一下打没了。 */
+  lost: Set<number>;
+  draws?: number;
+}
+
+/** 每一个吃坑点单独估算（卡组研究页按「打掉了哪些重要终端」重新挑最痛的一下）。 */
+export function evaluateHits(combo: Combo): HitEval[] {
+  const io = combo.steps.map(stepIO);
+  const stepNo = new Map(combo.steps.map((s, i) => [s.id, i + 1]));
+  return analyzeCombo(combo).hits.map((hit) => {
+    const e = evaluate(combo, io, hit);
+    return { hit, step: stepNo.get(hit.stepId)!, score: e.score, reason: e.reason, lost: e.lost, ...(e.draws !== undefined && { draws: e.draws }) };
+  });
+}
+
+/** 某一步的效果被无效时打掉的卡（重要终端依赖哪几步）。 */
+export function lossIfNegated(combo: Combo, stepIndex: number): Set<number> {
+  const io = combo.steps.map(stepIO);
+  return propagate(io, stepIndex, [], [stepIndex]).cards;
 }
 
 /** 每张能打的手坑的优先级，从最该防的开始排。 */

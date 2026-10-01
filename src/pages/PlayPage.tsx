@@ -16,6 +16,8 @@ import { forgetDuel, savedDuel, useDuel } from "../play/useDuel";
 import { useHandDrag } from "../play/useHandDrag";
 import { CardView } from "../ui/CardView";
 import { downloadCombo } from "../ui/download";
+import { sameHand, saveRoute } from "../study/model";
+import { setStudyTarget, studyStore, studyTarget } from "../study/store";
 
 interface PileView {
   title: string;
@@ -49,6 +51,7 @@ export default function PlayPage() {
   }, [data, duel]);
 
   const start = (setup: DuelSetup) => {
+    setStudyTarget(null);
     setPlaying(true);
     void duel.run(setup);
   };
@@ -89,6 +92,7 @@ export default function PlayPage() {
       duel={duel}
       onBack={() => {
         forgetDuel();
+        setStudyTarget(null);
         setPlaying(false);
       }}
     />
@@ -108,6 +112,13 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
   const placeRef = useRef<CardLoc | null>(null);
 
   const prompt = session?.status === "prompt" ? session.prompt : null;
+  // 从卡组研究页进来：起手对得上时可以把路线存回研究
+  const study = useMemo(() => {
+    const t = studyTarget();
+    const s = t && studyStore.find(t.studyId);
+    const starter = s?.starters.find((x) => x.id === t!.starterId);
+    return t && s && starter && session?.setup.hand && sameHand(session.setup.hand, starter.cards) ? { study: s, starter } : null;
+  }, [session]);
   const acts = useMemo(() => cardActions(data, prompt), [data, prompt, duel.version]); // eslint-disable-line react-hooks/exhaustive-deps
   const { respond } = duel;
   const closeMenu = useCallback(() => setMenu(null), []);
@@ -202,6 +213,16 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
   for (const l of session.log) byAction.set(l.action, [...(byAction.get(l.action) ?? []), l]);
 
   const canUndo = !busy && session.ownResponseIndices().length > 0;
+  const saveStudy = study && (
+    <button
+      className="btn primary"
+      onClick={() => saveToStudy(session, study.study.id, study.starter.id)}
+      disabled={busy || !canExport(session)}
+      title={canExport(session) ? `把这条路线存进卡组研究「${study.study.name}」` : "打完这一回合（结束回合）后才能保存"}
+    >
+      保存到研究
+    </button>
+  );
   const tools = (
     <>
       <button className="btn" onClick={onBack}>
@@ -234,6 +255,7 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
       >
         分析这条 combo
       </button>
+      {saveStudy}
     </>
   );
   const closeDrawer = () => setDrawer(false);
@@ -241,6 +263,12 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
 
   return (
     <main className={`page play dueling${drag.drag ? " dragging" : ""}`}>
+      {study && (
+        <div className="banner study-banner">
+          卡组研究「{study.study.name}」：起手 {study.starter.cards.map((c) => data.name(c)).join(" + ")}。打完回合后点「保存到研究」。
+          <a href={href.study(study.study.id)}>回到研究</a>
+        </div>
+      )}
       <div className="play-bar">
         {tools}
         {busy && <span className="muted">引擎计算中…</span>}
@@ -302,9 +330,11 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
               </p>
               <p className="muted">可以撤销回去换一条路线，或者在吃坑点让对手发动手坑，看被打断后还能做什么。「保存为 combo」把这条路线存成文件；「分析这条 combo」直接打开分析页，看手坑优先级。</p>
               <div className="prompt-foot">
-                <button className="btn primary" onClick={() => analyzeCombo(session)}>
-                  分析这条 combo
-                </button>
+                {saveStudy ?? (
+                  <button className="btn primary" onClick={() => analyzeCombo(session)}>
+                    分析这条 combo
+                  </button>
+                )}
               </div>
             </section>
           )}
@@ -349,11 +379,16 @@ function Duel({ data, duel, onBack }: { data: EngineData; duel: ReturnType<typeo
           撤销
         </button>
         <span className="mb-status">{busy ? "计算中…" : session.status === "turn_over" ? "回合结束" : ""}</span>
-        {session.status === "turn_over" && canExport(session) && (
-          <button className="btn primary" onClick={() => analyzeCombo(session)}>
-            分析
-          </button>
-        )}
+        {session.status === "turn_over" && canExport(session) &&
+          (study ? (
+            <button className="btn primary" onClick={() => saveToStudy(session, study.study.id, study.starter.id)}>
+              存到研究
+            </button>
+          ) : (
+            <button className="btn primary" onClick={() => analyzeCombo(session)}>
+              分析
+            </button>
+          ))}
         {phases.map((c) => (
           <button key={c.label} className="btn primary" disabled={busy} onClick={() => void respond(c.response)}>
             {c.label}
@@ -462,6 +497,25 @@ function analyzeCombo(session: DuelSession) {
     navigate(href.analyze(combo.id));
   } catch (e) {
     window.alert(`分析失败：${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+/** 把这条路线存进卡组研究，回到研究页。 */
+function saveToStudy(session: DuelSession, studyId: string, starterId: string) {
+  const study = studyStore.find(studyId);
+  const starter = study?.starters.find((s) => s.id === starterId);
+  if (!study || !starter) return window.alert("找不到这个卡组研究，可能已经被删除了。");
+  if (study.routes[starterId] && !window.confirm("这个动点已经存过一条路线，用这次的覆盖吗？")) return;
+  try {
+    const names = starter.cards.map((c) => session.data.name(c)).join(" + ");
+    const combo = toCombo(session, { title: `${study.name}：${names}`, deck: study.name });
+    combo.id = `${study.id}-${starter.id}`;
+    studyStore.save(saveRoute(study, starterId, combo));
+    // 播放、单条分析用的是「我的 combo」，同 id 的旧路线一起换掉
+    if (comboStore.isMine(combo.id)) comboStore.save([combo]);
+    navigate(href.study(studyId));
+  } catch (e) {
+    window.alert(`保存失败：${e instanceof Error ? e.message : String(e)}`);
   }
 }
 

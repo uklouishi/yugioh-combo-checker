@@ -7,7 +7,7 @@ import type { DuelSession, DuelSetup, Hit } from "../engine/session";
 const RESUME_KEY = "play-resume-v1";
 
 /** 当前对局存到 sessionStorage（同一个标签页里去分析页再回来时接着打）。bigint 存成 {$big}。 */
-function remember(s: DuelSession | null) {
+function remember(s: Pick<DuelSession, "setup" | "responses"> | null) {
   try {
     if (!s) sessionStorage.removeItem(RESUME_KEY);
     else
@@ -19,6 +19,9 @@ function remember(s: DuelSession | null) {
     // 存储不可用时不影响对局
   }
 }
+
+/** 让练习页打开时直接用这个设置开局（卡组研究页用）。 */
+export const queueDuel = (setup: DuelSetup) => remember({ setup, responses: [] });
 
 /** 读出上次的对局（没有则为 null）。 */
 export function savedDuel(): { setup: DuelSetup; responses: OcgResponse[] } | null {

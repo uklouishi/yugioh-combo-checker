@@ -9,6 +9,8 @@ import { ErrorBoundary } from "./ui/ErrorBoundary";
 
 // 规则引擎约 1.2 MB，只在练习页加载
 const PlayPage = lazy(() => import("./pages/PlayPage"));
+// 卡组研究也要引擎的卡片数据（卡名、卡片类型）
+const StudyPage = lazy(() => import("./pages/StudyPage"));
 
 export function App() {
   const route = useRoute();
@@ -17,6 +19,7 @@ export function App() {
     { to: href.open(), label: "打开", active: route.page === "open" || route.page === "view" },
     { to: href.create(), label: "创建", active: route.page === "create" || route.page === "edit" },
     { to: href.analyze(), label: "分析", active: route.page === "analyze" },
+    { to: href.study(), label: "研究", active: route.page === "study" },
   ];
   return (
     <>
@@ -44,6 +47,11 @@ export function App() {
         {route.page === "open" && <OpenPage />}
         {route.page === "view" && <ViewPage key={route.id} id={route.id} initialStep={route.step} />}
         {route.page === "analyze" && <AnalyzePage key={route.id ?? ""} id={route.id} />}
+        {route.page === "study" && (
+          <Suspense fallback={<main className="page"><p className="muted">正在加载卡片数据…</p></main>}>
+            <StudyPage key={route.id ?? ""} id={route.id} />
+          </Suspense>
+        )}
         {route.page === "create" && <EditorPage key="new" />}
         {route.page === "edit" && <EditorPage key={route.id} id={route.id} />}
       </ErrorBoundary>
