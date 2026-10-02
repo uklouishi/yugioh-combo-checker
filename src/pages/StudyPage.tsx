@@ -17,6 +17,7 @@ import { CardView } from "../ui/CardView";
 import { downloadJson } from "../ui/download";
 import { NotFound } from "./NotFound";
 import { StudyRecovery } from "./StudyRecovery";
+import { AutoNote, AutoPanel, editInPractice, useAutoRunner } from "./StudyAuto";
 
 const FORMAT_LABEL: Record<Format, string> = { tcg: "TCG", ocg: "OCG" };
 
@@ -212,6 +213,7 @@ function StudyDetail({ data, study }: { data: EngineData; study: DeckStudy }) {
   const [first, second] = useMemo(() => [5, 6].map((size) => simulateHands(study, cmp, { size, ...handOpts })), [study, cmp, handOpts]);
   const done = study.starters.filter((s) => study.routes[s.id]).length;
   const label = (s: Starter) => starterLabel(data, s);
+  const runner = useAutoRunner(data, study);
 
   const toggleSingle = (card: number) => {
     const existing = study.starters.find((s) => isSingle(s) && s.cards[0] === card);
@@ -311,6 +313,7 @@ function StudyDetail({ data, study }: { data: EngineData; study: DeckStudy }) {
         ) : (
           <>
             <p className="muted">点「打这一手」进练习模式，起手只有这几张，方便看清这一手单独能打到哪里。打完回合后点「保存到研究」回到这里。</p>
+            <AutoPanel data={data} study={study} runner={runner} />
             <ul className="starter-list">
               {study.starters.map((s) => {
                 const route = study.routes[s.id];
@@ -352,11 +355,27 @@ function StudyDetail({ data, study }: { data: EngineData; study: DeckStudy }) {
                       ) : (
                         <div className="muted">还没打</div>
                       )}
+                      <AutoNote data={data} study={study} starter={s} onChange={update} />
                     </div>
                     <div className="row-actions">
                       <button className={`btn${route ? "" : " primary"}`} onClick={() => play(s)}>
                         {route ? "重打" : "打这一手"}
                       </button>
+                      {study.auto[s.id] && route && (
+                        <button className="btn" onClick={() => editInPractice(study, s)}>
+                          在练习里改
+                        </button>
+                      )}
+                      {!route && (
+                        <button
+                          className="btn"
+                          disabled={!!runner.progress}
+                          onClick={() => void runner.run([s])}
+                          title="让电脑自己打这一手"
+                        >
+                          电脑打
+                        </button>
+                      )}
                       {route && (
                         <>
                           <button className="btn" onClick={() => view(s, "view")}>
